@@ -143,7 +143,7 @@ def _analog_channel_row(no: int, ch: Channel) -> list:
         f"{ch.rx_freq:.5f}",
         f"{ch.tx_freq:.5f}",
         ch.power,
-        "12.5KHz",
+        "25KHz",
         "None",
         "Allow TX",
         "None",

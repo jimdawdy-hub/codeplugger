@@ -285,6 +285,34 @@
       <div id="searchError" class="error hidden"></div>
     </div>
 
+    <!-- STEP 4b: Analog Repeaters -->
+    <div class="step" id="step4b">
+      <h2><span class="step-number">4b</span> Analog Repeaters</h2>
+      <p class="muted">FM repeaters from RadioReference for your locations. All go into a single "Analog" zone. CTCSS encode-only (standard ham practice).</p>
+      <button onclick="searchAnalog()" id="btnAnalog">Search Analog Repeaters</button>
+      <div id="analogResults" class="hidden mt-1">
+        <p class="muted mb-1">Select the analog repeaters to include.</p>
+        <div class="scroll-box">
+          <table class="repeater-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="selectAllAnalog" onchange="toggleAllAnalog()"></th>
+                <th>Name</th>
+                <th class="hide-mobile">Callsign</th>
+                <th>RX Freq</th>
+                <th class="hide-mobile">TX Freq</th>
+                <th>CTCSS</th>
+                <th class="hide-mobile">County</th>
+              </tr>
+            </thead>
+            <tbody id="analogTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="analogError" class="error hidden"></div>
+      <p class="muted mt-1" style="font-size:0.8rem">Coverage depends on city-to-county mapping. For best results, use zip code lookup in step 2.</p>
+    </div>
+
     <!-- STEP 5: Hotspot Talkgroups -->
     <div class="step" id="step5">
       <h2><span class="step-number">5</span> Hotspot Talkgroups</h2>
@@ -572,6 +600,71 @@
     }
 
     // -------------------------------------------------------------------------
+    // Step 4b: Analog repeaters
+    // -------------------------------------------------------------------------
+    let analogData = [];
+
+    async function searchAnalog() {
+      clearError('analogError');
+      const locations = [];
+      qsa('.location-row').forEach(row => {
+        const c = row.querySelector('.loc-city').value.trim();
+        const s = row.querySelector('.loc-state').value.trim();
+        if (c && s) locations.push({ city: c, state: s });
+      });
+      if (!locations.length) { setError('analogError', 'Add at least one location first'); return; }
+
+      qs('#btnAnalog').disabled = true;
+      qs('#btnAnalog').textContent = 'Searching...';
+      try {
+        const data = await api('/api/search-analog', {
+          method: 'POST',
+          body: JSON.stringify({ locations })
+        });
+        analogData = data.repeaters || [];
+        renderAnalog();
+        show(qs('#analogResults'));
+      } catch (e) {
+        setError('analogError', e || 'Search failed');
+      } finally {
+        qs('#btnAnalog').disabled = false;
+        qs('#btnAnalog').textContent = 'Search Analog Repeaters';
+      }
+    }
+
+    function renderAnalog() {
+      const tbody = qs('#analogTbody');
+      tbody.innerHTML = '';
+      analogData.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="analog-cb" data-idx="${idx}" checked></td>
+          <td><strong>${escapeHtml(r.name)}</strong></td>
+          <td class="hide-mobile">${escapeHtml(r.callsign)}</td>
+          <td>${r.rx_freq.toFixed(5)}</td>
+          <td class="hide-mobile">${r.tx_freq.toFixed(5)}</td>
+          <td>${r.ctcss_encode === 'None' ? '<span class="muted">CSQ</span>' : r.ctcss_encode}</td>
+          <td class="hide-mobile"><span class="muted">${escapeHtml(r.county_name)}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      qs('#selectAllAnalog').checked = true;
+    }
+
+    function toggleAllAnalog() {
+      const checked = qs('#selectAllAnalog').checked;
+      qsa('.analog-cb').forEach(cb => cb.checked = checked);
+    }
+
+    function getSelectedAnalog() {
+      return Array.from(qsa('.analog-cb:checked')).map(cb => {
+        const r = analogData[parseInt(cb.dataset.idx)];
+        return { name: r.name, callsign: r.callsign, rx_freq: r.rx_freq,
+                 tx_freq: r.tx_freq, ctcss_encode: r.ctcss_encode };
+      });
+    }
+
+    // -------------------------------------------------------------------------
     // Step 5b: Manual hotspot talkgroups
     // -------------------------------------------------------------------------
     function addManualTg(name='', tgId='') {
@@ -642,6 +735,7 @@
           selected_repeaters: selected,
           hotspot_tg_ids: hotspotTgs,
           manual_hotspot_tgs: getManualTgs(),
+          selected_analog: getSelectedAnalog(),
           hotspot_freq: parseFloat(qs('#hsFreq').value) || 433.550,
           power: qs('#power').value,
           initials,

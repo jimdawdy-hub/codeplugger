@@ -108,6 +108,28 @@ class ManualTG(BaseModel):
     tg_id: int
 
 
+class AnalogRepeaterInfo(BaseModel):
+    name:         str
+    callsign:     str
+    rx_freq:      float
+    tx_freq:      float
+    ctcss_encode: str
+    county_name:  str
+    selected:     bool = True
+
+
+class SearchAnalogRequest(BaseModel):
+    locations: List[Location]
+
+
+class AnalogRepeaterInput(BaseModel):
+    name:         str
+    callsign:     str
+    rx_freq:      float
+    tx_freq:      float
+    ctcss_encode: str
+
+
 class GenerateRequest(BaseModel):
     dmr_id: int
     callsign: str
@@ -118,6 +140,7 @@ class GenerateRequest(BaseModel):
     selected_repeaters: List[str]  # callsigns to include
     hotspot_tg_ids: List[int]
     manual_hotspot_tgs: List[ManualTG] = []
+    selected_analog: List[AnalogRepeaterInput] = []
     hotspot_freq: float = 433.550
     power: str = "High"
     country: str = "United States"
@@ -170,6 +193,43 @@ async def lookup_zip(zip_code: str):
     state_name = _STID_TO_NAME.get(info.stid, "")
     return {"zip": zip_code, "city": info.city, "state": state_name,
             "lat": info.lat, "lon": info.lon, "stid": info.stid, "ctid": info.ctid}
+
+
+@app.post("/api/search-analog")
+async def search_analog(req: SearchAnalogRequest):
+    """Return analog FM amateur repeaters for the given locations via RadioReference."""
+    creds = radioreference.load_credentials()
+    if not creds:
+        raise HTTPException(status_code=503, detail="RadioReference credentials not configured")
+
+    locations = [(loc.city, loc.state) for loc in req.locations]
+    repeaters = radioreference.search_analog_repeaters(locations, creds)
+
+    if not repeaters:
+        # Return empty list with a note if no county mapping found
+        unknown = [
+            f"{loc.city}, {loc.state}"
+            for loc in req.locations
+            if radioreference.get_ctid_for_location(loc.city, loc.state, creds) is None
+        ]
+        if unknown:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No county data for: {', '.join(unknown)}. Try adding locations via zip code lookup."
+            )
+
+    return {"repeaters": [
+        AnalogRepeaterInfo(
+            name         = r.name,
+            callsign     = r.callsign,
+            rx_freq      = r.rx_freq,
+            tx_freq      = r.tx_freq,
+            ctcss_encode = r.ctcss_encode,
+            county_name  = r.county_name,
+            selected     = True,
+        )
+        for r in repeaters
+    ]}
 
 
 @app.post("/api/search-repeaters")
@@ -337,6 +397,38 @@ async def generate(req: GenerateRequest):
                 hotspot_zone.channels.extend(new_channels)
             else:
                 codeplug.zones.append(Zone(name="Hotspot", channels=new_channels))
+
+    # Inject selected analog repeaters into an "Analog" zone
+    if req.selected_analog:
+        existing_channel_names = {c.name for c in codeplug.channels}
+        analog_channel_names: list[str] = []
+        for ar in req.selected_analog:
+            name = ar.name.strip()[:12]
+            if not name:
+                continue
+            # Disambiguate duplicate names
+            base, counter = name, 2
+            while name in existing_channel_names:
+                name = f"{base[:12 - len(str(counter))]}{counter}"
+                counter += 1
+            existing_channel_names.add(name)
+            codeplug.channels.append(Channel(
+                name         = name,
+                channel_type = "Analog",
+                rx_freq      = ar.rx_freq,
+                tx_freq      = ar.tx_freq,
+                color_code   = 0,
+                timeslot     = 1,
+                tx_contact   = "None",
+                rx_group     = "None",
+                power        = req.power,
+                dmr_id       = req.callsign,
+                ctcss_decode = "None",
+                ctcss_encode = ar.ctcss_encode,
+            ))
+            analog_channel_names.append(name)
+        if analog_channel_names:
+            codeplug.zones.append(Zone(name="Analog", channels=analog_channel_names[:64]))
 
     warnings = codeplug.validate()
     if warnings:
