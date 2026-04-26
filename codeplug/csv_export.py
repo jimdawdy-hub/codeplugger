@@ -36,9 +36,11 @@ CONTACTS_HEADERS = [
     "Remark", "Type", "Alert Call",
 ]
 
-# RX groups: No., Group Name, then Contact 1 … Contact 32
+# RX groups: No., RX Group Name, Contact Members (pipe-separated — same pattern as zones)
+# The CPS expects 3 columns, NOT one column per contact. The old 34-column format
+# was wrong and caused import failures.
 RX_GROUP_MAX_CONTACTS = 32
-RX_GROUP_HEADERS = ["No.", "Group Name"] + [f"Contact {i+1}" for i in range(RX_GROUP_MAX_CONTACTS)]
+RX_GROUP_HEADERS = ["No.", "RX Group Name", "Contact Members"]
 
 CHANNEL_HEADERS = [
     "No.", "Channel Name", "Channel Type",
@@ -77,12 +79,8 @@ def _contact_row(no: int, c: Contact) -> list:
 
 
 def _rx_group_row(no: int, g: RXGroup) -> list:
-    row = [no, g.name]
-    # Pad/truncate to exactly RX_GROUP_MAX_CONTACTS contact slots
-    contacts = list(g.contacts[:RX_GROUP_MAX_CONTACTS])
-    contacts += [""] * (RX_GROUP_MAX_CONTACTS - len(contacts))
-    row.extend(contacts)
-    return row
+    members = "|".join(g.contacts[:RX_GROUP_MAX_CONTACTS])
+    return [no, g.name, members]
 
 
 def _channel_row(no: int, ch: Channel) -> list:
