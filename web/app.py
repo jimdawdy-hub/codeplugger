@@ -22,12 +22,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 
-from codeplug import radioid, csv_export, brandmeister
+from codeplug import radioid, csv_export, brandmeister, radioreference
 from codeplug.builder import CodeplugBuilder
 from codeplug.models import CodeplugRequest, Repeater
 from codeplug.defaults import BM_HOTSPOT_TGS
 
 app = FastAPI(title="CODEPLUGGER")
+
+# Reverse map of RadioReference stid → state name (used by zip lookup response)
+_STID_TO_NAME: dict[int, str] = {v: k for k, v in radioreference._STATE_IDS.items()}
 
 # Serve static files (the single-page UI)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -125,6 +128,21 @@ async def lookup_user(req: LookupUserRequest):
         city=user.get("city", ""),
         state=user.get("state", ""),
     )
+
+
+@app.get("/api/lookup-zip/{zip_code}")
+async def lookup_zip(zip_code: str):
+    """Convert a US zip code to city, state, and coordinates."""
+    creds = radioreference.load_credentials()
+    if not creds:
+        raise HTTPException(status_code=503, detail="RadioReference credentials not configured")
+    info = radioreference.get_zip_info(zip_code, creds)
+    if not info:
+        raise HTTPException(status_code=404, detail=f"Zip code {zip_code} not found")
+    # Map RR state ID back to state name
+    state_name = _STID_TO_NAME.get(info.stid, "")
+    return {"zip": zip_code, "city": info.city, "state": state_name,
+            "lat": info.lat, "lon": info.lon, "stid": info.stid, "ctid": info.ctid}
 
 
 @app.post("/api/search-repeaters")
