@@ -25,6 +25,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from codeplug.repeater_db import get_connection, get_stats, list_states
 from codeplug.kml_import import import_kml_zip
 from codeplug.pdf_import import import_all_pdfs, import_pdf
+from codeplug.hearham_import import import_hearham, get_dmr_stats
 
 PROJECT_ROOT = pathlib.Path(__file__).parent
 
@@ -66,6 +67,8 @@ def main():
     parser.add_argument("--pdf-dir",   type=str, help="Import all PDFs in a directory")
     parser.add_argument("--pdfs-only", action="store_true", help="Skip KML import")
     parser.add_argument("--kml-only",  action="store_true", help="Skip PDF import")
+    parser.add_argument("--hearham",   nargs="*", metavar="ST",
+                        help="Import DMR TG data from HearHam. Optionally limit to state codes e.g. --hearham IL IN WI")
     parser.add_argument("--stats",     action="store_true", help="Show DB stats and exit")
     args = parser.parse_args()
 
@@ -110,6 +113,17 @@ def main():
                 total += import_pdf(pdf, verbose=True)
         else:
             print("\nNo PDFs found — skipping PDF import.")
+
+    # --- HearHam DMR TG import ---
+    if args.hearham is not None:
+        states = args.hearham if args.hearham else None
+        label = f"states: {', '.join(states)}" if states else "all states"
+        print(f"\nImporting DMR talkgroup data from HearHam ({label})...")
+        result = import_hearham(states=states, verbose=True)
+        print(f"  → HearHam: {result['repeaters']} repeaters, "
+              f"{result['talkgroups']} talkgroup records across {result['states']} states")
+        s = get_dmr_stats()
+        print(f"  → DB totals: {s['repeaters']} DMR repeaters, {s['talkgroups']} TG records, {s['states']} states")
 
     print(f"\nDone. Total new records inserted this run: {total:,}")
     show_stats()
