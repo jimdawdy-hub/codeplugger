@@ -1,13 +1,13 @@
-# DMR Codeplug Generator — Onboarding Guide
+# CODEPLUGGER — Onboarding Guide
 
 ## What This Project Does
 
 Automates generation of DMR radio codeplugs for the **Baofeng DM-32UV** radio.
-Queries RadioID.net for repeater data, cross-references with the BrandMeister API
-for network verification, and produces CSV files importable into the DM-32UV CPS
-programming software.
+Pulls repeater data from multiple sources (RadioID, BrandMeister, RadioReference,
+local SQLite database built from KML + PDFs), and produces a ZIP of CSV files
+importable into the DM-32UV CPS programming software.
 
-The **CLI tool** is fully working. The **web interface** (CODEPLUGGER) is built and functional — see Phase 2 section below.
+Both a **CLI tool** and a **web interface** (CODEPLUGGER) are fully working.
 
 ---
 
@@ -15,8 +15,8 @@ The **CLI tool** is fully working. The **web interface** (CODEPLUGGER) is built 
 
 - **Python**: Must use `python3.12` — the system `python3` is 3.14 and lacks the
   required packages. Run everything as `python3.12`.
-- **Dependencies**: `httpx>=0.27.0` (see `requirements.txt`)
-- **Install deps**: `pip3 install -r requirements.txt` (installs to 3.12 site-packages)
+- **Install deps**: `pip3 install -r requirements.txt`
+- **Key deps**: `httpx`, `fastapi`, `uvicorn`, `pdfplumber`
 
 ---
 
@@ -24,24 +24,42 @@ The **CLI tool** is fully working. The **web interface** (CODEPLUGGER) is built 
 
 ```
 dmr-codeplug/
-├── main.py                    # CLI entry point (argparse)
-├── requirements.txt           # httpx
-├── CHANGELOG.md               # Development history
-├── LESSONS_LEARNED.md         # DMR/BM/RadioID domain knowledge
-├── ONBOARDING.md              # This file
+├── main.py                      # CLI entry point (argparse)
+├── import_data.py               # Repeater DB import tool (KML, PDF, HearHam)
+├── requirements.txt
+├── CHANGELOG.md
+├── LESSONS_LEARNED.md
+├── ONBOARDING.md                # This file
+├── data/
+│   └── repeaters.db             # SQLite repeater database (gitignored, rebuild with import_data.py)
 ├── codeplug/
 │   ├── __init__.py
-│   ├── models.py              # Dataclasses: Talkgroup, Repeater, Channel, Zone, etc.
-│   ├── radioid.py             # RadioID.net API client
-│   ├── brandmeister.py        # BrandMeister API client + caching
-│   ├── defaults.py            # TG abbreviations, network prefixes, fallback TG lists
-│   ├── builder.py             # CodeplugBuilder: assembles codeplug from repeater data
-│   └── csv_export.py          # Writes the 4 DM-32UV CSV files
+│   ├── models.py                # Dataclasses: Talkgroup, Repeater, Channel, Zone, etc.
+│   ├── radioid.py               # RadioID.net API client
+│   ├── brandmeister.py          # BrandMeister API client + caching
+│   ├── radioreference.py        # RadioReference.com SOAP API client
+│   ├── repeater_db.py           # SQLite repeater DB (analog + digital repeaters)
+│   ├── kml_import.py            # KML/KMZ parser for Google Earth ham repeater data
+│   ├── pdf_import.py            # PDF parser for regional repeater directories
+│   ├── hearham_import.py        # HearHam.com DMR talkgroup scraper
+│   ├── defaults.py              # TG abbreviations, network prefixes, fallback TG lists
+│   ├── builder.py               # CodeplugBuilder: assembles codeplug from repeater data
+│   └── csv_export.py            # Writes the 4 DM-32UV CSV files + README.txt
 └── web/
-    ├── app.py                 # FastAPI backend
+    ├── app.py                   # FastAPI backend
     └── static/
         ├── index.html           # Single-page dark-themed UI
         └── logo.png             # CODEPLUGGER logo
+```
+
+---
+
+## Running the Web App
+
+```bash
+cd /home/jim/dmr-codeplug
+python3.12 -m uvicorn web.app:app --reload --port 8000
+# Open http://localhost:8000
 ```
 
 ---
@@ -57,34 +75,100 @@ python3.12 main.py \
   --max 40 \
   --hotspot --hs-tgs 91 93 3117 3118 9 310 312 \
   --out ./my_codeplug
-
-# Dry run (no files written):
-python3.12 main.py --dmr-id 3179879 --city Chicago --state Illinois --dry-run
-
-# List available hotspot talkgroups:
-python3.12 main.py --dmr-id 3179879 --city Chicago --state Illinois --list-hs-tgs
-
-# Force refresh of BrandMeister caches:
-python3.12 main.py ... --refresh-bm
 ```
+
+---
+
+## Repeater Database
+
+`data/repeaters.db` is a local SQLite database used to supplement the live API calls.
+It is **gitignored** — rebuild it with `import_data.py`.
+
+### Tables
+
+- **`repeaters`** — analog + digital repeaters from KML/PDF sources
+  - `(rx_freq, tx_freq, callsign, state)` UNIQUE constraint
+  - fields: source, callsign, city, state, country, rx_freq, tx_freq, ctcss_encode, mode, notes
+- **`dmr_repeaters`** — DMR repeaters from HearHam with color code
+  - `hearham_id` UNIQUE
+  - fields: hearham_id, callsign, city, state, rx_freq, tx_freq, color_code, network
+- **`dmr_talkgroups`** — per-repeater static TG list from HearHam
+  - FK: `repeater_id → dmr_repeaters.id`
+  - fields: timeslot, tg_id, tg_name
+
+### Import Tool
+
+```bash
+# Show DB stats
+python3.12 import_data.py --stats
+
+# Import KML from Google Drive ZIP (auto-discovers drive-download*.zip)
+python3.12 import_data.py
+
+# Import only specific states from KML
+python3.12 import_data.py --states IL IN WI
+
+# Import HearHam DMR TG data (be polite — 0.6s delay between requests)
+python3.12 import_data.py --hearham IL IN WI   # specific states
+python3.12 import_data.py --hearham             # all 50 states + DC + territories
+
+# Import a specific PDF
+python3.12 import_data.py --pdf Iowa_RC.pdf
+
+# Import all PDFs in a directory
+python3.12 import_data.py --pdf-dir /path/to/pdfs/
+```
+
+### KML Source
+
+Download the Google Earth Ham Repeaters KML ZIP from the Google Drive link shown
+when no ZIP is present. Place `drive-download*.zip` in the project root and run
+`import_data.py`. This contains RepeaterBook data for all 50 states, organized as:
+```
+{State}/2 Meters/{State} 2M.kml
+{State}/70 Centimeters/{State} 70CM.kml
+```
+
+### PDF Sources Supported
+
+Format auto-detected from first-page text:
+
+| Organization | State | Columns |
+|---|---|---|
+| Iowa Repeater Council | Iowa | City Output Call Access Mode Notes |
+| Minnesota Repeater Council | Minnesota | CITY REGION Output Call Club Access Notes Date |
+| Western Pennsylvania RC (WPRC) | Pennsylvania | Output Input Access Location Grid Call Trustee Sponsor Notes |
+| All Oregon Repeaters | Oregon | Freq± PL Location County Callsign Status |
+| Greater Rochester Area | New York | CH RECEIVE TRANSMIT TONE TRUSTEE LOCATION COMMENTS |
+
+### HearHam Coverage Note
+
+HearHam.com aggregates DMR repeaters with color code visible from the state listing.
+Only ~5% have manually-entered talkgroup lists on their detail pages. Most repeaters
+show callsign/freq/CC but no TG data. Useful for color code lookup; TG data is sparse.
 
 ---
 
 ## Config File
 
-`~/.config/dmr-codeplug.json` — stores the BrandMeister API key:
+`~/.config/dmr-codeplug.json` — API credentials:
 ```json
 {
-  "brandmeister_api_key": "eyJ0eXAi..."
+  "brandmeister_api_key": "eyJ0eXAi...",
+  "radioreference_app_key": "a476798c-40db-11f1-bb32-0ef97433b5f9",
+  "radioreference_username": "...",
+  "radioreference_password": "..."
 }
 ```
 
-**Never commit this file or the API key to source control.**
+**Never commit this file.** BM API key is also read from env var `BM_API_KEY`.
 
-## Cache Files (auto-managed, never expire unless --refresh-bm)
+## BrandMeister Cache Files (auto-managed)
 
 - `~/.config/dmr-codeplug-bm-devices.json` — all BM devices (~32K entries)
 - `~/.config/dmr-codeplug-bm-talkgroups.json` — BM talkgroup catalog (~1,750 entries)
+
+Use `--refresh-bm` (CLI) to force refresh.
 
 ---
 
@@ -93,271 +177,164 @@ python3.12 main.py ... --refresh-bm
 ```
 RadioID API
     ↓ search_repeaters(state, city, networks)
+    ↓ network alias expansion (NETWORK_ALIASES covers all ipsc_network spellings)
     ↓ deduplicate by callsign across locations
 BrandMeister API (cached)
-    ↓ verify network labels (correct mislabeled repeaters)
-    ↓ load talkgroup catalog (official names)
+    ↓ verify repeater is on BM (build_repeater_index)
+    ↓ load official talkgroup catalog
+    ↓ GET /v2/device/{bm_id}/talkgroup/ — per-device static TG config (future)
+RadioReference SOAP API
+    ↓ zip-code → city/state/coordinates
+    ↓ county amateur frequencies (FM, 2m/70cm only)
+Local repeater DB (data/repeaters.db)
+    ↓ analog repeater search by state
+    ↓ HearHam DMR TG lookup by callsign + frequency
 CodeplugBuilder
     ↓ build contacts, channels, zones per repeater
-    ↓ use BM talkgroup names > RadioID descriptions > TG_ABBREV fallback
+    ↓ TG name: BM catalog > RadioID description > TG_ABBREV fallback > T{id}
+    ↓ enforce MAX_NAME_LEN = 12 on all names
 csv_export
-    ↓ write 4 CSV files
-User imports into DM-32UV CPS (contacts → RX groups → channels → zones)
+    ↓ write 4 CSV files + README.txt → ZIP
+User imports: Talk Groups → RX Group Lists → Channels → Zones
 ```
 
 ---
 
 ## Key Design Decisions
 
-### RX Groups Are Generated But Not Populated
-`rx_group = "None"` on all channels. RX group building code exists in `builder.py`
-as commented-out blocks. This is intentional — with `GroupCall Match = Off` (the
-recommended ham setting), RX groups are ignored by the radio. Re-enable when
-per-repeater receive filtering is needed.
+### Name Length Limit: 12 Characters
 
-### Network Correction Logic
-- RadioID `ipsc_network` is self-reported and unreliable.
-- Any repeater confirmed in the BM device list (tx≠rx) gets its network field
-  corrected to "BrandMeister" automatically.
-- RadioID entries claiming BM that aren't in the BM registry get a warning but
-  are kept as-is (they may be temporarily offline).
+All channel names, zone names, contact names, and talkgroup names are capped at
+**12 characters** (`MAX_NAME_LEN = 12` in `builder.py`). This is stricter than
+the radio's actual limit to keep names readable on the small LCD.
 
-### Name Length Limits
-| Field | Limit | Notes |
-|-------|-------|-------|
-| Channel name | 16 chars | Displayed on radio LCD |
-| Zone name | 16 chars | Display only |
-| RX Group name | 11 chars | CPS silently drops refs >11 chars |
-| Contact name | 16 chars | Display in CPS |
+**Naming rules:**
+- Channel name: `{city_abbr}{freq_suffix} {tg_abbr}` — e.g. `ChiPtWav BM`
+- Zone name: `{city}{freq_suffix} {network_prefix}` — e.g. `Chicago975 BM`
+- Contact/TG name: `{abbr}` or `{abbr} {id}` — ID appended only when `len(abbr) ≤ 3`
+  (short abbreviations like `WW`, `NA`, `IL` need the ID to distinguish similar TGs;
+  longer words like `Parrot`, `Local`, `Calling` are self-identifying)
+- Disambiguation: counter appended as `{base[:12-len(str(n))]}{n}`
 
-### One Zone Per Repeater
-Each repeater gets its own zone. Zone name format: `{city}{freq_suffix} {network_prefix}`
-e.g. "Chicago975 BM", "Skokie BM".
+### Parrot TG Must Be Private Call
 
-### Talkgroup Name Priority
-1. Official BM catalog name (from BM API)
-2. RadioID description field
-3. `TG_ABBREV` dictionary in `defaults.py`
-4. `T{id}` fallback (truncated to 6 chars)
+BrandMeister Parrot (diagnostic echo-back tool) is **silently ignored as a Group Call**.
+It only works as a **Private Call**.
+
+- **9990** — worldwide BM Parrot (primary)
+- **310997** — US regional Parrot (MCC 310 + suffix 997); also Private Call
+- **9998** — legacy alias; kept in TG_ABBREV for compat
+
+`PRIVATE_CALL_TGS = {9990, 9998, 310997}` in `defaults.py`. Contacts for these IDs
+use `call_type="Private Call"` in `builder.py`.
+
+### Network Alias Expansion
+
+RadioID `ipsc_network` is self-reported with inconsistent spellings. `NETWORK_ALIASES`
+in `web/app.py` maps canonical UI labels to all observed variants:
+
+- **BrandMeister**: "BrandMeister", "Brandmeister", "BRANDMEISTER", "BM", etc.
+- **DMR-MARC**: "DMR-MARC", "MARC", "ChicagoLand-CC", "Chicagoland-CC", "chi-dmr",
+  "DMR-IL", "Chicagoland C-Bridge", "Chicago Land", "chicago land cc ", etc.
+- **Tristate**: "Tristate", "TriState", "TriStateDMR", "TriSTateDMR"
+
+Without this expansion, searching for DMR-MARC returns ~8 IL results instead of ~43.
+
+### Analog Repeaters
+
+- Sourced from: local repeater DB (KML/PDF) + RadioReference SOAP API
+- Filtered to 2m (144-148 MHz) and 70cm (420-450 MHz) only — DM-32UV can't TX on 6m or 220
+- CTCSS encode-only (no decode) — standard ham practice unless directory says otherwise
+- All grouped into a single "Analog" zone in the codeplug
+
+### RX Groups
+
+RX groups are generated (3-column CSV: No., RX Group Name, Contact Members pipe-separated)
+but all channels use `rx_group="None"`. This is correct for `GroupCall Match = Off`
+(the recommended ham setting). Re-enable when per-repeater RX filtering is needed.
 
 ---
 
----
+## Web UI User Flow
 
-## Phase 2: Web Interface (CODEPLUGGER) — **BUILT**
-
-### Status
-The web interface is **complete and functional**. It is a single-page application
-served by FastAPI, with a dark theme and orange accent matching the logo.
-
-### Running the Web App
-```bash
-cd /home/jim/dmr-codeplug
-pip3 install -r requirements.txt   # installs fastapi + uvicorn
-python3.12 -m uvicorn web.app:app --reload --port 8000
-# Open http://localhost:8000
-```
-
-### User Flow
-1. **DMR ID lookup** — enter DMR ID, app fetches callsign/name/location from RadioID
-2. **Locations** — add one or more city/state pairs (multi-location search)
-3. **Networks** — checkbox selection (BrandMeister, DMR-MARC, Tristate, ChicagoLand-CC)
-4. **Find Repeaters** — searches RadioID, shows table with:
-   - Checkboxes for selection
-   - BM verification badge (✓BM = confirmed on BrandMeister API)
-   - Talkgroup summary per repeater
-5. **Hotspot Talkgroups** — accordion-grouped catalog with search filter
-6. **Options** — TX power, hotspot frequency
-7. **Legal Disclaimer** — checkbox + initials required before download
-8. **Generate & Download** — returns ZIP with 4 CSV files
+1. **DMR ID** — enter DMR ID, fetches callsign/name/location from RadioID
+2. **Locations** — add city/state pairs; also supports US zip code lookup
+3. **Networks** — BrandMeister, DMR-MARC, Tristate checkboxes
+4. **Find Repeaters** — searches RadioID with network alias expansion; shows BM verification
+5. **Analog Repeaters** — searches local DB + RadioReference; checkable table
+6. **Hotspot Talkgroups** — BM catalog accordion + manual TG entry (name + TG number)
+7. **Options** — TX power, hotspot frequency
+8. **Legal Disclaimer** — checkbox + initials required
+9. **Generate & Download** — returns `codeplug_{callsign}.zip`
 
 ### API Endpoints
+
 ```
 GET  /                          → Serves index.html
-GET  /api/hotspot-talkgroups    → Grouped BM TG catalog for UI
+GET  /api/hotspot-talkgroups    → Grouped BM TG catalog
 POST /api/lookup-user           → { dmr_id } → { callsign, name, city, state }
-POST /api/search-repeaters      → { locations, networks } → [repeater list]
-POST /api/generate              → { dmr_id, callsign, locations, networks,
-                                    selected_repeaters, hotspot_tg_ids, power,
-                                    hotspot_freq, initials }
-                                 → ZIP download (application/zip)
+GET  /api/lookup-zip/{zip}      → { city, state, lat, lon } via RadioReference
+POST /api/search-repeaters      → { locations, networks } → [DMR repeater list]
+POST /api/search-analog         → { locations } → [analog repeater list]
+POST /api/generate              → full generate request → ZIP download
 ```
 
-### Web UI Features
-- **No build step** — vanilla JS, single HTML file
-- **Dark theme** with CSS variables (`--bg: #0a0a0f`, `--accent: #ff6b35`)
-- **Responsive** — mobile-friendly repeater table with `hide-mobile` columns
-- **Collapsible TG picker** — accordion groups with expand/collapse and live search
-- **BM verification badges** — green ✓BM for confirmed, yellow — for unverified
-- **Legal disclaimer** with checkbox + 2+ character initials requirement
-- **Ad space placeholder** and copyright footer (© 2026 James Dawdy, KQ9I)
-- **Logo** displayed at top (`/static/logo.png`)
+---
 
-### Backend Architecture
-- `web/app.py` — FastAPI app, UI-agnostic business logic reused from `codeplug/`
-- Repeater search uses same `radioid.search_repeaters()` + dedup logic as CLI
-- BM verification uses same `brandmeister.build_repeater_index()` as CLI
-- Codeplug generation uses same `CodeplugBuilder` + `csv_export.write_zip()` as CLI
-- **No per-state max cap in web UI** — user selects repeaters manually, so all found
-  repeaters are displayed and the user picks what they want
+## DM-32UV CSV Import Order
+
+**Critical:** The CPS requires this exact import sequence:
+
+1. **Talk Groups** (`talk_groups.csv`)
+2. **RX Group Lists** (`rx_group_lists.csv`)
+3. **Channels** (`channels.csv`)
+4. **Zones** (`zones.csv`)
+
+Importing in wrong order causes `TX Contact` fields to show "None".
+
+The downloaded ZIP includes `README.txt` with this info and a legal disclaimer.
 
 ---
 
-## Major Changes to Python Scripts (April 2025)
+## Known Issues / TODOs
 
-### 1. Talk Groups.csv Replaces Digital Contacts for TX Contact Lookups
-**Critical discovery:** The DM-32UV CPS has **two separate tables**:
-- **Talk Groups.csv** — group-call talkgroups that `TX Contact` references **by name**
-- **Digital Contacts.csv** — personal address book for **private calls** (ham operators)
+### BM Per-Device TG Endpoint (Next Up)
 
-We were generating `digital_contacts.csv` with talkgroup entries, but the CPS looks
-in **Talk Groups** for `TX Contact` lookups. Since no `Talk Groups.csv` was generated,
-every `TX Contact` defaulted to `"None"`.
+`GET /v2/device/{bm_id}/talkgroup/` returns `[{talkgroup, slot, repeaterid}]` —
+the static TG configuration for a BM-verified repeater. This should be wired in
+as a fallback when RadioID has no TG data for BM repeaters.
 
-**Fix:** `csv_export.py` now generates `talk_groups.csv` (No., Name, ID, Type) with
-all referenced talkgroups. `digital_contacts.csv` is no longer included in the ZIP
-output (the function still exists but is not called by `write_zip()`).
+Tested manually:
+- N9ZD (312361): TG 31172 TS1, TG 312361 TS2
+- KD9COF (310963): TG 310963 TS2, TG 3219369 TS2
+- N9GPY (311690): TG 31673 TS2, TG 311690 TS2
 
-**Import order:** Talk Groups → RX Group Lists → Channels → Zones
+### Disconnect Channel May Need TS1 Variant
 
-### 2. Per-State `--max` Distribution (CLI only)
-**Problem:** Illinois state fallback returned 42+ repeaters, consuming all `--max`
-slots before Indiana ever got a look. With `--max 40` and 2 states, Illinois got
-everything and Indiana was truncated to zero.
+The automatic TG 4000 disconnect channel is hardcoded to TS2. On some repeaters
+(especially DMR-MARC), the active TGs may all be on TS1. Should consider following
+the "majority" timeslot or generating two disconnect channels.
 
-**Fix:** `args.max` is divided across unique states in `main.py`. With 2 states and
-`--max 40`, each gets 20 slots. The web UI does not use this cap — user selects
-repeaters manually.
+### HearHam Coverage is Sparse
 
-### 3. Channel Name Cleanup — T1/T2 Suffix Removed
-**Problem:** Channel names included `T1` or `T2` suffix (e.g. `Chicago975 T1 WW`).
-This consumed 3 characters of the 16-char limit with redundant information.
+Only ~5% of HearHam's DMR repeaters have manually entered TG lists. HearHam is useful
+for color code discovery but not reliable as a TG data source.
 
-**Fix:** Removed timeslot suffix from all channel names in `builder.py`. The timeslot
-is stored in the `Time Slot` column; the suffix was display noise. Now:
-- `Chicago975 WW` instead of `Chicago975 T1 WW`
-- `Chicago975 Local` instead of `Chicago975 T2 Local`
+### BM Last-Heard Not Available via REST
 
-### 4. Automatic Disconnect Channel (TG 4000)
-**Problem:** No way to disconnect from reflectors/talkgroups without manually
-programming a TG 4000 channel.
-
-**Fix:** Every repeater and hotspot now gets an automatic disconnect channel on
-**TS2** unless TG 4000 is already present in the repeater's talkgroup list:
-- Repeater: e.g. `"Chicago450 Disc"` (contact: `"BM Disc 4000"`)
-- Hotspot: e.g. `"HS Disc 4000"`
-- Uses BM catalog name "Disconnect", abbreviated to "Disc" (fits 16-char limit)
-- TG 4000 works on both BrandMeister and DMR-MARC networks
-
-### 5. BM API Key from Environment Variable
-**Change:** `brandmeister.py` now checks `os.environ.get("BM_API_KEY")` **before**
-falling back to `~/.config/dmr-codeplug.json`. This allows the web app to run on
-servers without a config file — just set `BM_API_KEY` in the environment.
-
-### 6. Logo and Web Assets
-- Added `logo.png` to `web/static/`
-- Orange accent color `#ff6b35` matches the logo
-- Ad space placeholder with contact email
-- Copyright footer: "© 2026 James Dawdy, KQ9I"
-
----
-
-## Known Issues / TODOs for Claude Code
-
-### 1. ~~Parrot TG Should Be Private Call~~ — **FIXED**
-**Resolution:** The BrandMeister Parrot is a diagnostic tool that repeats your
-transmission back to you. It **only works as a Private Call** — as a Group Call
-it is silently ignored by BM.
-
-**Correct IDs (both must be Private Call):**
-- **9990** — Primary worldwide BM Parrot
-- **310997** — US regional Parrot (MCC 310 + suffix 997); verified working with
-  Private Call in the DM-32UV CPS
-- **9998** — Legacy alias kept in TG_ABBREV for compatibility; 9990/310997 preferred
-
-**What changed:**
-- `defaults.py`: Added `PRIVATE_CALL_TGS = {9990, 9998, 310997}`
-- `builder.py`: Contact creation uses `"Private Call"` for any TG in that set
-- `BM_HOTSPOT_TGS`: Replaced the 9998 entry with 9990 and 310997 entries
-- `TG_ABBREV`: all three → `"Parrot"` — human-readable, no trailing ID needed
-- `builder.py` naming rule: ID is appended only for short abbreviations (≤3 chars,
-  e.g. WW, NA, IL); longer abbreviations are self-identifying words and omit the ID
-
-**Import note:** `talk_groups.csv` now shows `Type = Private Call` for these
-entries. The CPS must have the Talk Group entry present before importing channels.
-
-### 2. Disconnect Channel May Need TS1 Variant
-**Issue:** The automatic disconnect channel is hardcoded to **TS2**. On some
-repeaters (especially DMR-MARC), the disconnect may need to be on the same
-timeslot as the talkgroup you're trying to disconnect from. Currently if a
-repeater has all its TGs on TS1, the disconnect is still on TS2.
-
-**Consideration:** Should the disconnect channel follow the "majority" timeslot
-of the repeater? Or should there be two disconnect channels (one per TS)?
-BrandMeister convention puts disconnect on TS2, but this may not be universal.
-
-### 3. Digital Contacts.csv — Optional Private-Call Address Book
-**Issue:** The current output excludes `digital_contacts.csv` entirely. Some users
-may want a personal address book of ham operators for private calls. This should
-be an **optional** feature (checkbox in web UI, flag in CLI).
-
-**Implementation idea:** Add a `--contacts` CLI flag and a web UI checkbox. When
-enabled, generate `digital_contacts.csv` with known ham operators (possibly from
-a user-supplied list or from the DMR ID database).
-
-### 4. Channel Name Collisions on Multi-Repeater Cities
-**Issue:** When a city has multiple repeaters on different frequencies, the
-disconnect channel names can collide. The current code has a disambiguation
-counter (`disc_ch_name2`, `disc_ch_name3`, etc.), but this looks ugly.
-
-**Example:** Two Chicago repeaters (443.450 and 442.100) both get disconnect
-channels. The second one becomes `Chicago450 Disc2` or similar.
-
-**Better approach:** Include the frequency suffix in the disconnect channel name
-when there are multiple repeaters in the same city, e.g. `Chicago450 Disc` and
-`Chicago100 Disc`.
-
-### 5. Web UI Enhancements Needed
-- **Loading states:** Some operations (repeater search, generate) have minimal
-  loading feedback beyond button text changes.
-- **Error handling:** Network errors during repeater search could show more
-  helpful messages.
-- **Export individual CSVs:** Currently only ZIP download is supported. Some users
-  may want individual files.
-- **Preview before download:** Show a summary of what will be generated
-  (channel count, zone count, etc.) before the user clicks Generate.
-- **Save/load configurations:** Let users save their location/network/TG selections
-  as a preset (localStorage or server-side).
-
-### 6. TX Contact Field Verification
-**Issue:** The exact format the CPS expects for `TX Contact` matching against the
-Talk Group list has been verified to work, but we should test edge cases:
-- Talkgroup names with special characters (parentheses, slashes)
-- Very long talkgroup names that get truncated
-- Unicode characters in BM catalog names
-
-### 7. RX Group Lists — Currently All "None"
-**Current state:** All channels use `rx_group="None"`. This is correct when
-`GroupCall Match = Off` (recommended ham setting). If a user wants to enable
-`GroupCall Match = On`, they would need per-repeater RX groups.
-
-**Future enhancement:** Add a CLI flag `--rx-groups` and web UI checkbox to
-enable RX group generation. The commented-out code in `builder.py` can be
-re-enabled for this.
-
-### 8. Network-Specific Default Talkgroups
-**Issue:** The fallback talkgroup lists (`BM_DEFAULTS`, `MARC_DEFAULTS`) are
-hardcoded in `defaults.py`. These may not be appropriate for all regions.
-
-**Enhancement:** Allow users to customize default talkgroups per network, or
-fetch them from a config file.
+The BrandMeister v2 REST API does not expose last-heard data. That data is only
+available via the real-time WebSocket feed. Last-heard cannot be used as a
+filter to rank repeaters without a streaming connection.
 
 ---
 
 ## Domain Contacts / Resources
 
-- **RadioID API docs**: https://radioid.net/api/
-- **BrandMeister API**: https://api.brandmeister.network/v2
-- **BM network status**: https://brandmeister.network/?page=lh
-- **User callsign**: KQ9I (DMR ID: 3179879), Dyer, Indiana
-- **User's hotspot**: 433.550 MHz simplex, registered on BM as KQ9I
+- **RadioID API**: https://radioid.net/api/
+- **BrandMeister API v2**: https://api.brandmeister.network/v2
+- **BM per-device TGs**: `GET https://api.brandmeister.network/v2/device/{id}/talkgroup/`
+- **HearHam state page**: `https://hearham.com/repeaters/state/{ST}`
+- **RadioReference WSDL**: `http://api.radioreference.com/soap2/?wsdl&v=latest`
+- **Google Earth ham repeaters**: https://drive.google.com/drive/folders/10Lvzkdtox8vG7iNkpQHSOIUfn8yUNV5b
+- **User**: KQ9I (DMR ID: 3179879), Dyer, Indiana
+- **User hotspot**: 433.550 MHz simplex, registered on BM as KQ9I
