@@ -73,12 +73,16 @@ def main():
           f"({user.get('city', '')}, {user.get('state', '')})")
 
     # --- Step 2: Search for repeaters ---
-    # Map common network aliases for the API query
+    # RadioID ipsc_network is self-reported — cover all observed spellings.
     network_aliases = {
-        "BrandMeister": ["BrandMeister", "Brandmeister", "BM"],
-        "DMR-MARC":     ["DMR-MARC"],
-        "ChicagoLand-CC": ["ChicagoLand-CC", "Chicagoland-CC"],
-        "Tristate":     ["Tristate", "TriState"],
+        "BrandMeister": ["BrandMeister", "Brandmeister", "BRANDMEISTER", "BM", "bm", "Bm",
+                         "BrandMesiter", "Brandmister"],
+        "DMR-MARC":     ["DMR-MARC", "MARC",
+                         "ChicagoLand-CC", "Chicagoland-CC", "ChicagoLand-CC ",
+                         "ChicagoLand", "Chicagoland", "Chicago Land", "chicago land cc ",
+                         "Chicagoland C-Bridge", "chi-dmr", "DMR-IL"],
+        "Tristate":     ["Tristate", "TriState", "TriStateDMR", "TriSTateDMR"],
+        "ChicagoLand-CC": [],  # folded into DMR-MARC above
     }
     api_networks: list[str] = []
     for n in args.networks:

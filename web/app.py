@@ -32,6 +32,27 @@ app = FastAPI(title="CODEPLUGGER")
 # Reverse map of RadioReference stid → state name (used by zip lookup response)
 _STID_TO_NAME: dict[int, str] = {v: k for k, v in radioreference._STATE_IDS.items()}
 
+# RadioID ipsc_network spellings are self-reported and wildly inconsistent.
+# Each key is the canonical UI label; the list covers all observed variants.
+NETWORK_ALIASES: dict[str, list[str]] = {
+    "BrandMeister": ["BrandMeister", "Brandmeister", "BRANDMEISTER", "BM", "bm", "Bm",
+                     "BrandMesiter", "Brandmister"],
+    "DMR-MARC":     ["DMR-MARC", "MARC",
+                     "ChicagoLand-CC", "Chicagoland-CC", "ChicagoLand-CC ",
+                     "ChicagoLand", "Chicagoland", "Chicago Land", "chicago land cc ",
+                     "Chicagoland C-Bridge", "chi-dmr", "DMR-IL"],
+    "Tristate":     ["Tristate", "TriState", "TriStateDMR", "TriSTateDMR"],
+    "ChicagoLand-CC": [],  # folded into DMR-MARC above; kept for UI compat
+}
+
+
+def _expand_networks(selected: list[str]) -> list[str]:
+    """Expand UI network names to all RadioID ipsc_network variants."""
+    out: list[str] = []
+    for n in selected:
+        out.extend(NETWORK_ALIASES.get(n, [n]))
+    return out
+
 # Serve static files (the single-page UI)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -147,16 +168,7 @@ async def lookup_zip(zip_code: str):
 
 @app.post("/api/search-repeaters")
 async def search_repeaters(req: SearchRepeatersRequest):
-    # Map network aliases for the API query
-    network_aliases = {
-        "BrandMeister": ["BrandMeister", "Brandmeister", "BM", "bm"],
-        "DMR-MARC": ["DMR-MARC", "MARC"],
-        "ChicagoLand-CC": ["ChicagoLand-CC", "Chicagoland-CC"],
-        "Tristate": ["Tristate", "TriState"],
-    }
-    api_networks: list[str] = []
-    for n in req.networks:
-        api_networks.extend(network_aliases.get(n, [n]))
+    api_networks = _expand_networks(req.networks)
 
     # Search repeaters per location (no per-state caps in web UI — user selects)
     seen_callsigns: set[str] = set()
@@ -225,15 +237,7 @@ async def generate(req: GenerateRequest):
         raise HTTPException(status_code=400, detail="Initials required")
 
     # Re-fetch repeaters (same logic as search)
-    network_aliases = {
-        "BrandMeister": ["BrandMeister", "Brandmeister", "BM", "bm"],
-        "DMR-MARC": ["DMR-MARC", "MARC"],
-        "ChicagoLand-CC": ["ChicagoLand-CC", "Chicagoland-CC"],
-        "Tristate": ["Tristate", "TriState"],
-    }
-    api_networks: list[str] = []
-    for n in req.networks:
-        api_networks.extend(network_aliases.get(n, [n]))
+    api_networks = _expand_networks(req.networks)
 
     seen_callsigns: set[str] = set()
     state_searched: set[str] = set()
