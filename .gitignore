@@ -21,5 +21,12 @@ tg list.csv
 .vscode/
 *.swp
 
+# Repeater database (rebuilt by import_data.py)
+data/repeaters.db
+
+# Source data files (PDFs, KML ZIPs — large, copyrighted)
+*.pdf
+drive-download*.zip
+
 # Secrets (never commit)
 ~/.config/dmr-codeplug.json

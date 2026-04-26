@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from typing import List
 
 from codeplug import radioid, csv_export, brandmeister, radioreference
+from codeplug import repeater_db
 from codeplug.builder import CodeplugBuilder
 from codeplug.models import Channel, CodeplugRequest, Contact, Repeater, Zone
 from codeplug.defaults import BM_HOTSPOT_TGS
@@ -197,39 +198,52 @@ async def lookup_zip(zip_code: str):
 
 @app.post("/api/search-analog")
 async def search_analog(req: SearchAnalogRequest):
-    """Return analog FM amateur repeaters for the given locations via RadioReference."""
+    """
+    Return analog FM amateur repeaters for the given locations.
+
+    Sources (merged and deduplicated):
+      1. Local database (KML/PDF imports — broadest coverage)
+      2. RadioReference API county-level search (real-time, where county ID is known)
+    """
+    seen: set[tuple] = set()
+    results: list[AnalogRepeaterInfo] = []
+
+    def _add(name: str, callsign: str, rx: float, tx: float, ctcss: str, region: str):
+        key = (round(rx, 4), round(tx, 4))
+        if key in seen:
+            return
+        seen.add(key)
+        results.append(AnalogRepeaterInfo(
+            name=name[:12], callsign=callsign, rx_freq=rx, tx_freq=tx,
+            ctcss_encode=ctcss or "None", county_name=region, selected=True,
+        ))
+
+    # --- Source 1: local database ---
+    try:
+        conn = repeater_db.get_connection()
+        unique_states = list(dict.fromkeys(loc.state for loc in req.locations))
+        for state in unique_states:
+            db_rows = repeater_db.search_analog(conn, state=state)
+            for r in db_rows:
+                name = r.callsign or f"{r.rx_freq:.4f}"
+                _add(name, r.callsign, r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.city or state)
+        conn.close()
+    except Exception as e:
+        print(f"[search-analog] DB error: {e}")
+
+    # --- Source 2: RadioReference API ---
     creds = radioreference.load_credentials()
-    if not creds:
-        raise HTTPException(status_code=503, detail="RadioReference credentials not configured")
+    if creds:
+        try:
+            locations = [(loc.city, loc.state) for loc in req.locations]
+            rr_repeaters = radioreference.search_analog_repeaters(locations, creds)
+            for r in rr_repeaters:
+                _add(r.name, r.callsign, r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.county_name)
+        except Exception as e:
+            print(f"[search-analog] RadioReference error: {e}")
 
-    locations = [(loc.city, loc.state) for loc in req.locations]
-    repeaters = radioreference.search_analog_repeaters(locations, creds)
-
-    if not repeaters:
-        # Return empty list with a note if no county mapping found
-        unknown = [
-            f"{loc.city}, {loc.state}"
-            for loc in req.locations
-            if radioreference.get_ctid_for_location(loc.city, loc.state, creds) is None
-        ]
-        if unknown:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No county data for: {', '.join(unknown)}. Try adding locations via zip code lookup."
-            )
-
-    return {"repeaters": [
-        AnalogRepeaterInfo(
-            name         = r.name,
-            callsign     = r.callsign,
-            rx_freq      = r.rx_freq,
-            tx_freq      = r.tx_freq,
-            ctcss_encode = r.ctcss_encode,
-            county_name  = r.county_name,
-            selected     = True,
-        )
-        for r in repeaters
-    ]}
+    results.sort(key=lambda r: (r.county_name, r.rx_freq))
+    return {"repeaters": results}
 
 
 @app.post("/api/search-repeaters")
