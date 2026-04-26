@@ -294,6 +294,19 @@
       <div id="tgError" class="error hidden"></div>
     </div>
 
+    <!-- STEP 5b: Manual Hotspot Talkgroups -->
+    <div class="step" id="step5b">
+      <h2><span class="step-number">5b</span> Manual BrandMeister Talkgroup Entry</h2>
+      <p class="muted">Add talkgroups not in the catalog above. Name is what appears on the radio LCD (12 chars max).</p>
+      <div class="row" style="margin-bottom:0.25rem">
+        <div style="flex:2"><span class="muted" style="font-size:0.8rem">Display Name (12 chars max)</span></div>
+        <div style="flex:1"><span class="muted" style="font-size:0.8rem">TG Number</span></div>
+        <div style="width:40px"></div>
+      </div>
+      <div id="manualTgList"></div>
+      <button class="secondary mt-1" onclick="addManualTg()">+ Add Talkgroup</button>
+    </div>
+
     <!-- STEP 6: Options -->
     <div class="step" id="step6">
       <h2><span class="step-number">6</span> Options</h2>
@@ -559,6 +572,33 @@
     }
 
     // -------------------------------------------------------------------------
+    // Step 5b: Manual hotspot talkgroups
+    // -------------------------------------------------------------------------
+    function addManualTg(name='', tgId='') {
+      const div = document.createElement('div');
+      div.className = 'row manual-tg-row';
+      div.style.marginBottom = '0.4rem';
+      div.innerHTML = `
+        <div style="flex:2"><input type="text" class="manual-tg-name" placeholder="e.g. Midwest" maxlength="12" value="${escapeHtml(name)}"></div>
+        <div style="flex:1"><input type="number" class="manual-tg-id" placeholder="e.g. 3169" min="1" value="${tgId}"></div>
+        <div style="width:40px;display:flex;align-items:center;justify-content:center">
+          <button class="secondary" style="padding:0.3rem 0.6rem" onclick="this.closest('.manual-tg-row').remove()">✕</button>
+        </div>
+      `;
+      qs('#manualTgList').appendChild(div);
+    }
+
+    function getManualTgs() {
+      const rows = [];
+      qsa('.manual-tg-row').forEach(row => {
+        const name = row.querySelector('.manual-tg-name').value.trim().slice(0, 12);
+        const id   = parseInt(row.querySelector('.manual-tg-id').value, 10);
+        if (name && id > 0) rows.push({ name, tg_id: id });
+      });
+      return rows;
+    }
+
+    // -------------------------------------------------------------------------
     // Step 8: Generate
     // -------------------------------------------------------------------------
     async function generateCodeplug() {
@@ -601,6 +641,7 @@
           networks,
           selected_repeaters: selected,
           hotspot_tg_ids: hotspotTgs,
+          manual_hotspot_tgs: getManualTgs(),
           hotspot_freq: parseFloat(qs('#hsFreq').value) || 433.550,
           power: qs('#power').value,
           initials,

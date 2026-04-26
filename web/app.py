@@ -24,7 +24,7 @@ from typing import List
 
 from codeplug import radioid, csv_export, brandmeister, radioreference
 from codeplug.builder import CodeplugBuilder
-from codeplug.models import CodeplugRequest, Repeater
+from codeplug.models import Channel, CodeplugRequest, Contact, Repeater, Zone
 from codeplug.defaults import BM_HOTSPOT_TGS
 
 app = FastAPI(title="CODEPLUGGER")
@@ -103,6 +103,11 @@ class SearchRepeatersResponse(BaseModel):
     repeaters: List[RepeaterInfo]
 
 
+class ManualTG(BaseModel):
+    name: str    # display name, already validated to ≤12 chars by the UI
+    tg_id: int
+
+
 class GenerateRequest(BaseModel):
     dmr_id: int
     callsign: str
@@ -112,6 +117,7 @@ class GenerateRequest(BaseModel):
     networks: List[str]
     selected_repeaters: List[str]  # callsigns to include
     hotspot_tg_ids: List[int]
+    manual_hotspot_tgs: List[ManualTG] = []
     hotspot_freq: float = 433.550
     power: str = "High"
     country: str = "United States"
@@ -292,9 +298,48 @@ async def generate(req: GenerateRequest):
     builder = CodeplugBuilder(cp_req, bm_talkgroups=bm_talkgroups)
     codeplug = builder.build(repeaters)
 
+    # Inject manually entered hotspot talkgroups
+    if req.manual_hotspot_tgs:
+        existing_contact_names = {c.name for c in codeplug.contacts}
+        existing_channel_names = {c.name for c in codeplug.channels}
+        new_channels: list[str] = []
+
+        for mtg in req.manual_hotspot_tgs:
+            name = mtg.name.strip()[:12]
+            if not name or mtg.tg_id < 1:
+                continue
+            if name not in existing_contact_names:
+                codeplug.contacts.append(Contact(
+                    name=name, dmr_id=mtg.tg_id, call_type="Group Call"
+                ))
+                existing_contact_names.add(name)
+            if name not in existing_channel_names:
+                codeplug.channels.append(Channel(
+                    name=name,
+                    channel_type="Digital",
+                    rx_freq=req.hotspot_freq,
+                    tx_freq=req.hotspot_freq,
+                    color_code=1,
+                    timeslot=2,
+                    tx_contact=name,
+                    rx_group="None",
+                    power="Low",
+                    tx_admit="Always",
+                    dmr_id=req.callsign,
+                ))
+                existing_channel_names.add(name)
+                new_channels.append(name)
+
+        # Add to the Hotspot zone, or create it if none exists yet
+        if new_channels:
+            hotspot_zone = next((z for z in codeplug.zones if z.name == "Hotspot"), None)
+            if hotspot_zone:
+                hotspot_zone.channels.extend(new_channels)
+            else:
+                codeplug.zones.append(Zone(name="Hotspot", channels=new_channels))
+
     warnings = codeplug.validate()
     if warnings:
-        # Log warnings but don't block
         print("[generate] warnings:", warnings)
 
     zip_bytes = csv_export.write_zip(codeplug)
