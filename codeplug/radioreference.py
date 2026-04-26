@@ -396,10 +396,9 @@ def get_analog_repeaters_for_county(ctid: int, creds: RRCredentials) -> list[Ana
             continue
         if f.input_freq <= 0 or abs(f.output_freq - f.input_freq) < 0.001:
             continue
-        # Amateur bands: 6m, 2m, 1.25m, 70cm (skip HF, 33cm, etc.)
+        # DM-32UV supports 2m and 70cm only
         out = f.output_freq
-        if not (50 <= out <= 54 or 144 <= out <= 148 or
-                219 <= out <= 225 or 420 <= out <= 450):
+        if not (144 <= out <= 148 or 420 <= out <= 450):
             continue
 
         key = (round(f.output_freq, 4), round(f.input_freq, 4))
