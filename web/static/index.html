@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CODEPLUGGER — DM-32UV Codeplug Generator</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --card: #16161d;
+      --text: #e8e8f0;
+      --muted: #8b8b9e;
+      --accent: #ff6b35;
+      --accent-hover: #ff8555;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #2a2a3a;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: var(--accent); }
+    a:hover { color: var(--accent-hover); }
+    .container { max-width: 960px; margin: 0 auto; padding: 1rem; }
+
+    /* Header */
+    header {
+      text-align: center;
+      padding: 1.5rem 1rem 0.5rem;
+    }
+    header img {
+      max-width: 320px;
+      width: 90%;
+      height: auto;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+    }
+    header p {
+      margin: 0.5rem 0 0;
+      color: var(--muted);
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+    }
+
+    /* Cards / Steps */
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin: 1rem 0;
+      padding: 1.25rem;
+    }
+    .step h2 {
+      margin: 0 0 1rem;
+      font-size: 1.1rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .step-number {
+      background: var(--accent);
+      color: #fff;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 600;
+    }
+
+    /* Form elements */
+    label { display: block; font-weight: 500; margin: 0.75rem 0 0.25rem; font-size: 0.9rem; }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      background: #0f0f14;
+      color: var(--text);
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 140px; }
+    .row .btn-inline { flex: 0 0 auto; align-self: flex-end; }
+
+    .checkbox-grid { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; margin-top: 0.5rem; }
+    .checkbox-grid label { display: flex; align-items: center; gap: 0.4rem; font-weight: 400; cursor: pointer; margin: 0; }
+    .checkbox-grid input { width: auto; }
+
+    button, .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0.6rem 1.25rem;
+      border: none; border-radius: var(--radius);
+      background: var(--accent); color: #fff;
+      font-size: 1rem; font-weight: 500; cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover, .btn:hover { background: var(--accent-hover); }
+    button:disabled, .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: var(--muted); }
+    button.secondary:hover { background: #4b5563; }
+    button.success { background: var(--success); }
+    button.success:hover { background: #15803d; }
+
+    /* Repeater table */
+    .repeater-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }
+    .repeater-table th, .repeater-table td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .repeater-table th { background: #1e1e28; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: var(--muted); position: sticky; top: 0; }
+    .repeater-table tr:hover { background: #1e1e28; }
+    .repeater-table input[type="checkbox"] { transform: scale(1.2); }
+    .badge { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+    .badge-bm { background: #164020; color: #86efac; }
+    .badge-warn { background: #3a2a00; color: #fbbf24; }
+    .scroll-box { max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+
+    /* TG Accordion */
+    .tg-group { border: 1px solid var(--border); border-radius: var(--radius); margin: 0.5rem 0; overflow: hidden; }
+    .tg-group-header {
+      background: #1e1e28;
+      padding: 0.6rem 0.9rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+      font-weight: 600; font-size: 0.95rem;
+      user-select: none;
+    }
+    .tg-group-header:hover { background: #252532; }
+    .tg-group-header::after { content: "▸"; font-size: 0.9rem; transition: transform 0.2s; }
+    .tg-group.open .tg-group-header::after { transform: rotate(90deg); }
+    .tg-group-body { display: none; padding: 0.75rem; }
+    .tg-group.open .tg-group-body { display: block; }
+    .tg-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+    .tg-item input { margin: 0; }
+    .tg-item span { font-size: 0.9rem; }
+    .tg-item .tg-id { color: var(--muted); font-size: 0.8rem; font-family: monospace; }
+    .tg-search { margin-bottom: 0.75rem; }
+
+    /* Disclaimer */
+    .disclaimer-box {
+      background: #1a0f0f;
+      border: 1px solid #3a2020;
+      border-radius: var(--radius);
+      padding: 1rem;
+      font-size: 0.9rem;
+      color: #e8c8c8;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .disclaimer-box h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+    .disclaimer-box p { margin: 0.35rem 0; }
+    .disclaimer-agree { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
+    .disclaimer-agree input { width: auto; }
+
+    /* Footer */
+    .ad-space {
+      background: var(--card);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      margin: 2rem 0 1rem;
+    }
+    .ad-space a { color: var(--accent); }
+    footer {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Utilities */
+    .hidden { display: none !important; }
+    .loading { opacity: 0.6; pointer-events: none; }
+    .error { color: var(--danger); font-size: 0.9rem; margin-top: 0.25rem; }
+    .success-text { color: var(--success); font-size: 0.9rem; margin-top: 0.25rem; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    .text-right { text-align: right; }
+    .mt-1 { margin-top: 0.5rem; }
+    .mb-1 { margin-bottom: 0.5rem; }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.8rem; }
+      .repeater-table th, .repeater-table td { padding: 0.4rem 0.35rem; font-size: 0.8rem; }
+      .repeater-table .hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="/static/logo.png" alt="CODEPLUGGER">
+      <p>Automatic code plug generation for the DM-32UV</p>
+    </header>
+
+    <!-- STEP 1: DMR ID -->
+    <div class="step" id="step1">
+      <h2><span class="step-number">1</span> Your DMR ID</h2>
+      <div class="row">
+        <div style="flex:2">
+          <label for="dmrId">DMR ID</label>
+          <input type="number" id="dmrId" placeholder="e.g. 3179879" min="1">
+        </div>
+        <div class="btn-inline">
+          <button onclick="lookupUser()" id="btnLookup">Look Up</button>
+        </div>
+      </div>
+      <div id="userInfo" class="hidden mt-1">
+        <p><strong>Callsign:</strong> <span id="uiCallsign"></span></p>
+        <p><strong>Name:</strong> <span id="uiName"></span></p>
+        <p><strong>Location:</strong> <span id="uiLocation"></span></p>
+      </div>
+      <div id="lookupError" class="error hidden"></div>
+    </div>
+
+    <!-- STEP 2: Locations -->
+    <div class="step" id="step2">
+      <h2><span class="step-number">2</span> Locations</h2>
+      <p class="muted">Add one or more city/state pairs. We'll search for repeaters in each area.</p>
+      <div id="locationsList">
+        <div class="row location-row">
+          <div><input type="text" class="loc-city" placeholder="City" value="Chicago"></div>
+          <div><input type="text" class="loc-state" placeholder="State" value="Illinois"></div>
+          <div class="btn-inline"><button class="secondary" onclick="removeLocation(this)">✕</button></div>
+        </div>
+      </div>
+      <button class="secondary mt-1" onclick="addLocation()">+ Add Location</button>
+    </div>
+
+    <!-- STEP 3: Networks -->
+    <div class="step" id="step3">
+      <h2><span class="step-number">3</span> Networks</h2>
+      <div class="checkbox-grid">
+        <label><input type="checkbox" class="net-cb" value="BrandMeister" checked> BrandMeister</label>
+        <label><input type="checkbox" class="net-cb" value="DMR-MARC" checked> DMR-MARC</label>
+        <label><input type="checkbox" class="net-cb" value="Tristate"> Tristate</label>
+        <label><input type="checkbox" class="net-cb" value="ChicagoLand-CC"> ChicagoLand-CC</label>
+      </div>
+    </div>
+
+    <!-- STEP 4: Search Repeaters -->
+    <div class="step" id="step4">
+      <h2><span class="step-number">4</span> Find Repeaters</h2>
+      <button onclick="searchRepeaters()" id="btnSearch">Search Repeaters</button>
+      <div id="repeaterResults" class="hidden mt-1">
+        <p class="muted mb-1">Select the repeaters you want in your codeplug. ✓BM = verified on BrandMeister.</p>
+        <div class="scroll-box">
+          <table class="repeater-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="selectAll" onchange="toggleAllRepeaters()"></th>
+                <th>Callsign</th>
+                <th>City</th>
+                <th class="hide-mobile">State</th>
+                <th class="hide-mobile">Freq</th>
+                <th>CC</th>
+                <th>Network</th>
+                <th>BM</th>
+                <th class="hide-mobile">Talkgroups</th>
+              </tr>
+            </thead>
+            <tbody id="repeaterTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="searchError" class="error hidden"></div>
+    </div>
+
+    <!-- STEP 5: Hotspot Talkgroups -->
+    <div class="step" id="step5">
+      <h2><span class="step-number">5</span> Hotspot Talkgroups</h2>
+      <p class="muted">Select talkgroups for your hotspot zone (simplex 433.550 MHz).</p>
+      <input type="text" class="tg-search" id="tgSearch" placeholder="Search talkgroups..." oninput="filterTGs()">
+      <div id="tgContainer"></div>
+      <div id="tgError" class="error hidden"></div>
+    </div>
+
+    <!-- STEP 6: Options -->
+    <div class="step" id="step6">
+      <h2><span class="step-number">6</span> Options</h2>
+      <div class="row">
+        <div>
+          <label for="power">TX Power</label>
+          <select id="power">
+            <option value="High" selected>High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div>
+          <label for="hsFreq">Hotspot Frequency (MHz)</label>
+          <input type="text" id="hsFreq" value="433.550">
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 7: Disclaimer -->
+    <div class="step" id="step7">
+      <h2><span class="step-number">7</span> Legal Disclaimer</h2>
+      <div class="disclaimer-box">
+        <h3>Terms of Use</h3>
+        <p>By generating and downloading a codeplug from CODEPLUGGER, you acknowledge and agree to the following:</p>
+        <p><strong>Use at your own risk.</strong> This software generates codeplug files based on publicly available repeater data. The generated files are provided "as is" without warranty of any kind.</p>
+        <p><strong>Review required.</strong> You are solely responsible for carefully reviewing the generated codeplug before importing it into your radio. Verify frequencies, offsets, color codes, talkgroups, and all other parameters.</p>
+        <p><strong>No liability.</strong> You release James Dawdy (KQ9I), the website host, and any related entity from any and all liability, claims, damages, or losses arising from or related to the use of this software, the generated codeplug files, or any damage to your radio or other equipment.</p>
+        <p><strong>Compliance.</strong> You are responsible for ensuring your radio programming complies with all applicable laws, regulations, and license conditions in your jurisdiction.</p>
+      </div>
+      <div class="disclaimer-agree">
+        <input type="checkbox" id="agreeBox">
+        <label for="agreeBox" style="margin:0;font-weight:400">I have read and agree to the terms above.</label>
+      </div>
+      <div class="row mt-1">
+        <div style="flex:0 0 200px">
+          <label for="initials">Your Initials</label>
+          <input type="text" id="initials" placeholder="e.g. JD" maxlength="4">
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 8: Generate -->
+    <div class="step" id="step8" style="text-align:center">
+      <button class="success" onclick="generateCodeplug()" id="btnGenerate" style="font-size:1.2rem;padding:0.8rem 2rem">
+        📻 Generate & Download Codeplug
+      </button>
+      <div id="genError" class="error hidden mt-1"></div>
+    </div>
+
+    <!-- Ad Space -->
+    <div class="ad-space">
+      <p>📢 <strong>Advertise Here</strong></p>
+      <p>Reach DMR operators, ham radio enthusiasts, and codeplug users.<br>Contact <a href="mailto:ads@codeplugger.radio">ads@codeplugger.radio</a> for rates.</p>
+    </div>
+
+    <footer>
+      <p>© 2026 James Dawdy, KQ9I. All rights reserved.</p>
+      <p class="muted">CODEPLUGGER is not affiliated with Baofeng, BrandMeister, or RadioID.net.</p>
+    </footer>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+    let userCallsign = '';
+    let repeaterData = [];
+    let tgData = {};
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+    function qs(sel) { return document.querySelector(sel); }
+    function qsa(sel) { return document.querySelectorAll(sel); }
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+    function setError(id, msg) {
+      const el = qs('#' + id);
+      el.textContent = msg;
+      show(el);
+    }
+    function clearError(id) { hide(qs('#' + id)); }
+    function api(path, opts) {
+      return fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts })
+        .then(r => { if (!r.ok) return r.json().then(j => Promise.reject(j.detail || r.statusText)); return r.json(); });
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 1: DMR Lookup
+    // -------------------------------------------------------------------------
+    async function lookupUser() {
+      const id = parseInt(qs('#dmrId').value, 10);
+      if (!id || id < 1000) { setError('lookupError', 'Enter a valid DMR ID'); return; }
+      clearError('lookupError');
+      qs('#btnLookup').disabled = true;
+      try {
+        const data = await api('/api/lookup-user', { method: 'POST', body: JSON.stringify({ dmr_id: id }) });
+        userCallsign = data.callsign;
+        qs('#uiCallsign').textContent = data.callsign;
+        qs('#uiName').textContent = data.name;
+        qs('#uiLocation').textContent = data.city + ', ' + data.state;
+        show(qs('#userInfo'));
+      } catch (e) {
+        setError('lookupError', e || 'Lookup failed');
+      } finally {
+        qs('#btnLookup').disabled = false;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 2: Locations
+    // -------------------------------------------------------------------------
+    function addLocation(city='', state='') {
+      const div = document.createElement('div');
+      div.className = 'row location-row';
+      div.innerHTML = `
+        <div><input type="text" class="loc-city" placeholder="City" value="${city}"></div>
+        <div><input type="text" class="loc-state" placeholder="State" value="${state}"></div>
+        <div class="btn-inline"><button class="secondary" onclick="removeLocation(this)">✕</button></div>
+      `;
+      qs('#locationsList').appendChild(div);
+    }
+    function removeLocation(btn) {
+      const rows = qsa('.location-row');
+      if (rows.length <= 1) return; // keep at least one
+      btn.closest('.location-row').remove();
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 4: Search Repeaters
+    // -------------------------------------------------------------------------
+    async function searchRepeaters() {
+      clearError('searchError');
+      const locations = [];
+      qsa('.location-row').forEach(row => {
+        const c = row.querySelector('.loc-city').value.trim();
+        const s = row.querySelector('.loc-state').value.trim();
+        if (c && s) locations.push({ city: c, state: s });
+      });
+      if (!locations.length) { setError('searchError', 'Add at least one location'); return; }
+
+      const networks = Array.from(qsa('.net-cb:checked')).map(cb => cb.value);
+      if (!networks.length) { setError('searchError', 'Select at least one network'); return; }
+
+      qs('#btnSearch').disabled = true;
+      qs('#btnSearch').textContent = 'Searching...';
+      try {
+        const data = await api('/api/search-repeaters', {
+          method: 'POST',
+          body: JSON.stringify({ locations, networks })
+        });
+        repeaterData = data.repeaters || [];
+        renderRepeaters();
+        show(qs('#repeaterResults'));
+      } catch (e) {
+        setError('searchError', e || 'Search failed');
+      } finally {
+        qs('#btnSearch').disabled = false;
+        qs('#btnSearch').textContent = 'Search Repeaters';
+      }
+    }
+
+    function renderRepeaters() {
+      const tbody = qs('#repeaterTbody');
+      tbody.innerHTML = '';
+      repeaterData.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="rep-cb" data-idx="${idx}" checked></td>
+          <td><strong>${escapeHtml(r.callsign)}</strong></td>
+          <td>${escapeHtml(r.city)}</td>
+          <td class="hide-mobile">${escapeHtml(r.state)}</td>
+          <td class="hide-mobile">${r.rx_freq.toFixed(5)}</td>
+          <td>${r.color_code}</td>
+          <td>${escapeHtml(r.network)}</td>
+          <td>${r.bm_verified ? '<span class="badge badge-bm">✓BM</span>' : '<span class="badge badge-warn">—</span>'}</td>
+          <td class="hide-mobile"><span class="muted">${escapeHtml(r.timeslot_summary)}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      qs('#selectAll').checked = true;
+    }
+
+    function toggleAllRepeaters() {
+      const checked = qs('#selectAll').checked;
+      qsa('.rep-cb').forEach(cb => cb.checked = checked);
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 5: Hotspot Talkgroups
+    // -------------------------------------------------------------------------
+    async function loadTalkgroups() {
+      try {
+        const data = await api('/api/hotspot-talkgroups');
+        tgData = data.groups || {};
+        renderTalkgroups();
+      } catch (e) {
+        setError('tgError', e || 'Failed to load talkgroups');
+      }
+    }
+
+    function renderTalkgroups(filter='') {
+      const container = qs('#tgContainer');
+      container.innerHTML = '';
+      const flt = filter.toLowerCase();
+      Object.keys(tgData).forEach(groupName => {
+        const items = tgData[groupName].filter(t =>
+          !flt || t.name.toLowerCase().includes(flt) || String(t.id).includes(flt)
+        );
+        if (!items.length && flt) return;
+
+        const div = document.createElement('div');
+        div.className = 'tg-group';
+        div.innerHTML = `
+          <div class="tg-group-header" onclick="toggleTGGroup(this)">
+            <span>${escapeHtml(groupName)} <span class="muted">(${items.length})</span></span>
+          </div>
+          <div class="tg-group-body">
+            ${items.map(t => `
+              <label class="tg-item">
+                <input type="checkbox" class="tg-cb" value="${t.id}" data-name="${escapeHtml(t.name)}">
+                <span>${escapeHtml(t.name)}</span>
+                <span class="tg-id">(${t.id})</span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function toggleTGGroup(header) {
+      header.parentElement.classList.toggle('open');
+    }
+
+    function filterTGs() {
+      renderTalkgroups(qs('#tgSearch').value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 8: Generate
+    // -------------------------------------------------------------------------
+    async function generateCodeplug() {
+      clearError('genError');
+
+      const dmrId = parseInt(qs('#dmrId').value, 10);
+      if (!dmrId) { setError('genError', 'Enter your DMR ID'); return; }
+      if (!userCallsign) { setError('genError', 'Look up your DMR ID first'); return; }
+
+      const locations = [];
+      qsa('.location-row').forEach(row => {
+        const c = row.querySelector('.loc-city').value.trim();
+        const s = row.querySelector('.loc-state').value.trim();
+        if (c && s) locations.push({ city: c, state: s });
+      });
+      if (!locations.length) { setError('genError', 'Add at least one location'); return; }
+
+      const networks = Array.from(qsa('.net-cb:checked')).map(cb => cb.value);
+      if (!networks.length) { setError('genError', 'Select at least one network'); return; }
+
+      const selected = Array.from(qsa('.rep-cb:checked')).map(cb => repeaterData[cb.dataset.idx].callsign);
+      if (!selected.length) { setError('genError', 'Select at least one repeater'); return; }
+
+      const hotspotTgs = Array.from(qsa('.tg-cb:checked')).map(cb => parseInt(cb.value, 10));
+
+      if (!qs('#agreeBox').checked) { setError('genError', 'You must agree to the disclaimer'); return; }
+      const initials = qs('#initials').value.trim().toUpperCase();
+      if (initials.length < 2) { setError('genError', 'Type your initials (2+ characters)'); return; }
+
+      qs('#btnGenerate').disabled = true;
+      qs('#btnGenerate').textContent = 'Generating...';
+
+      try {
+        const body = JSON.stringify({
+          dmr_id: dmrId,
+          callsign: userCallsign,
+          city: locations[0].city,
+          state: locations[0].state,
+          locations,
+          networks,
+          selected_repeaters: selected,
+          hotspot_tg_ids: hotspotTgs,
+          hotspot_freq: parseFloat(qs('#hsFreq').value) || 433.550,
+          power: qs('#power').value,
+          initials,
+        });
+
+        const resp = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw err.detail || resp.statusText;
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `codeplug_${userCallsign}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        qs('#btnGenerate').textContent = '✓ Downloaded!';
+        setTimeout(() => { qs('#btnGenerate').textContent = '📻 Generate & Download Codeplug'; qs('#btnGenerate').disabled = false; }, 3000);
+      } catch (e) {
+        setError('genError', e || 'Generation failed');
+        qs('#btnGenerate').disabled = false;
+        qs('#btnGenerate').textContent = '📻 Generate & Download Codeplug';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Utilities
+    // -------------------------------------------------------------------------
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // -------------------------------------------------------------------------
+    // Init
+    // -------------------------------------------------------------------------
+    loadTalkgroups();
+  </script>
+</body>
+</html>

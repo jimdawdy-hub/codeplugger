@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# Generated codeplug output
+my_codeplug/
+output/
+*.zip
+
+# Test/scratch files
+Channels_corrupt_export.csv
+tg list.csv
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Secrets (never commit)
+~/.config/dmr-codeplug.json
