@@ -25,7 +25,7 @@ from typing import List
 from codeplug import radioid, csv_export, brandmeister, radioreference
 from codeplug import repeater_db
 from codeplug.builder import CodeplugBuilder
-from codeplug.models import Channel, CodeplugRequest, Contact, Repeater, Zone
+from codeplug.models import Channel, CodeplugRequest, Contact, Repeater, Talkgroup, Zone
 from codeplug.defaults import BM_HOTSPOT_TGS
 
 app = FastAPI(title="CODEPLUGGER")
@@ -350,8 +350,36 @@ async def generate(req: GenerateRequest):
     # BM data
     bm_talkgroups: dict[int, str] = {}
     bm_key = brandmeister._load_api_key()
+    bm_index: dict = {}
     if bm_key:
         bm_talkgroups = brandmeister.get_all_talkgroups(bm_key)
+        devices = brandmeister.get_all_devices(bm_key)
+        if devices:
+            bm_index = brandmeister.build_repeater_index(devices)
+
+    # Enrich BM-verified repeaters that RadioID returned with no talkgroup data.
+    # GET /v2/device/{id}/talkgroup/ returns the static TG config the sysop entered.
+    if bm_key and bm_index:
+        for rep in repeaters:
+            if rep.talkgroups:
+                continue  # RadioID already gave us TG data — keep it
+            bm_records = brandmeister.get_repeater_records(rep.callsign, bm_index)
+            for bm_dev in bm_records:
+                dev_id = bm_dev.get("id")
+                if not dev_id:
+                    continue
+                raw_tgs = brandmeister.get_device_talkgroups(dev_id, bm_key)
+                if raw_tgs:
+                    rep.talkgroups = [
+                        Talkgroup(
+                            id=int(entry["talkgroup"]),
+                            timeslot=int(entry.get("slot", 2)),
+                            description=bm_talkgroups.get(int(entry["talkgroup"]), ""),
+                        )
+                        for entry in raw_tgs
+                        if entry.get("talkgroup")
+                    ]
+                    break  # use first device record that has TG data
 
     # Build request
     primary = req.locations[0] if req.locations else Location(city="", state="")

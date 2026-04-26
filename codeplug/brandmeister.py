@@ -133,3 +133,34 @@ def get_all_talkgroups(api_key: str = "", force_refresh: bool = False) -> dict[i
 def tg_name(tg_id: int, catalog: dict[int, str]) -> str:
     """Return the official BM name for a talkgroup ID, or empty string if unknown."""
     return catalog.get(tg_id, "")
+
+
+# ---------------------------------------------------------------------------
+# Per-device static talkgroup configuration
+# ---------------------------------------------------------------------------
+
+def get_device_talkgroups(device_id: int, api_key: str = "") -> list[dict]:
+    """
+    Fetch the static talkgroup configuration for a specific BM device.
+
+    Returns list of {talkgroup: int, slot: int, repeaterid: int}.
+    Returns [] on any error (device not found, no API key, network error).
+
+    Endpoint: GET /v2/device/{id}/talkgroup/
+    """
+    if not api_key:
+        api_key = _load_api_key()
+    if not api_key:
+        return []
+    try:
+        with httpx.Client(timeout=_TIMEOUT) as client:
+            resp = client.get(
+                f"{BM_API_BASE}/device/{device_id}/talkgroup/",
+                headers=_headers(api_key),
+            )
+        if resp.status_code == 404:
+            return []
+        resp.raise_for_status()
+        return resp.json() or []
+    except Exception:
+        return []
