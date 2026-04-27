@@ -32,7 +32,7 @@ That's it. No accounts, no API keys required.
 CODEPLUGGER is written in Python, so you need to install Python first. Python is free.
 
 1. Open your web browser and go to **https://www.python.org/downloads/**
-2. Click the big yellow **"Download Python 3.12.x"** button (the version number after 3.12 doesn't matter — any 3.12 works)
+2. Click the big yellow **"Download Python 3.x"** button (any version 3.10 or newer works — at the time of writing that's 3.14)
 3. Open the file you just downloaded (it's in your Downloads folder)
 4. **VERY IMPORTANT:** at the bottom of the installer window, check the box that says **"Add python.exe to PATH"** — if you skip this, nothing else will work
 5. Click **"Install Now"**
@@ -42,7 +42,7 @@ CODEPLUGGER is written in Python, so you need to install Python first. Python is
 ```
 python --version
 ```
-Press Enter. You should see `Python 3.12.something`. If you see "not recognized as a command," you missed the PATH checkbox in step 4 — uninstall Python and start over.
+Press Enter. You should see `Python 3.something` (e.g. `Python 3.14.0`). If you see "not recognized as a command," you missed the PATH checkbox in step 4 — uninstall Python and start over.
 
 Close that window when you're done.
 
