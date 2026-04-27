@@ -224,7 +224,13 @@ async def search_analog(req: SearchAnalogRequest):
     raw: list[dict] = []  # {city, state, callsign, rx, tx, ctcss, region}
 
     def _add(city: str, state: str, callsign: str, rx: float, tx: float, ctcss: str, region: str):
-        key = (round(rx, 4), round(tx, 4))
+        # Deduplicate by callsign+freq (catches same repeater in DB and RR).
+        # Fall back to freq+state when callsign is unknown, so same-frequency
+        # repeaters in different states are NOT collapsed into one.
+        if callsign:
+            key: tuple = (callsign.upper(), round(rx, 4))
+        else:
+            key = (round(rx, 4), round(tx, 4), state)
         if key in seen:
             return
         seen.add(key)
