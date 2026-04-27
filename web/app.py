@@ -24,9 +24,13 @@ from typing import List
 
 from codeplug import radioid, csv_export, brandmeister, radioreference
 from codeplug import repeater_db
+from codeplug import bm_talkgroups as bm_catalog_mod
 from codeplug.builder import CodeplugBuilder
 from codeplug.models import Channel, CodeplugRequest, Contact, Repeater, Talkgroup, Zone
-from codeplug.defaults import BM_HOTSPOT_TGS
+
+# Load TG catalog and name map from CSV once at startup
+_BM_CATALOG: dict = bm_catalog_mod.load_catalog()
+_BM_TG_NAMES: dict[int, str] = bm_catalog_mod.load_tg_names()
 
 app = FastAPI(title="CODEPLUGGER")
 
@@ -116,6 +120,7 @@ class AnalogRepeaterInfo(BaseModel):
     tx_freq:      float
     ctcss_encode: str
     county_name:  str
+    state:        str = ""
     selected:     bool = True
 
 
@@ -129,6 +134,7 @@ class AnalogRepeaterInput(BaseModel):
     rx_freq:      float
     tx_freq:      float
     ctcss_encode: str
+    state:        str = ""
 
 
 class GenerateRequest(BaseModel):
@@ -159,12 +165,11 @@ async def index():
 
 @app.get("/api/hotspot-talkgroups")
 async def hotspot_talkgroups():
-    """Return the BM hotspot talkgroup catalog grouped by category."""
-    groups: dict[str, list[dict]] = {}
-    for tg in BM_HOTSPOT_TGS:
-        g = tg["group"]
-        groups.setdefault(g, []).append({"id": tg["id"], "name": tg["name"]})
-    return {"groups": groups}
+    """Return the BM hotspot talkgroup catalog grouped by category (from CSV)."""
+    return {
+        "groups": _BM_CATALOG,
+        "category_order": bm_catalog_mod.CATEGORY_ORDER,
+    }
 
 
 @app.post("/api/lookup-user")
@@ -196,6 +201,12 @@ async def lookup_zip(zip_code: str):
             "lat": info.lat, "lon": info.lon, "stid": info.stid, "ctid": info.ctid}
 
 
+def _city_abbrev(city: str, max_len: int = 12) -> str:
+    """Strip punctuation/spaces from a city name, truncate to max_len."""
+    import re
+    return re.sub(r"['\-\. ]", "", city)[:max_len]
+
+
 @app.post("/api/search-analog")
 async def search_analog(req: SearchAnalogRequest):
     """
@@ -204,29 +215,32 @@ async def search_analog(req: SearchAnalogRequest):
     Sources (merged and deduplicated):
       1. Local database (KML/PDF imports — broadest coverage)
       2. RadioReference API county-level search (real-time, where county ID is known)
-    """
-    seen: set[tuple] = set()
-    results: list[AnalogRepeaterInfo] = []
 
-    def _add(name: str, callsign: str, rx: float, tx: float, ctcss: str, region: str):
+    Channel names use city name (like DMR repeaters), with a 3-digit frequency
+    suffix appended when multiple repeaters share the same city name.
+    """
+    # Collect raw entries before name assignment
+    seen: set[tuple] = set()
+    raw: list[dict] = []  # {city, state, callsign, rx, tx, ctcss, region}
+
+    def _add(city: str, state: str, callsign: str, rx: float, tx: float, ctcss: str, region: str):
         key = (round(rx, 4), round(tx, 4))
         if key in seen:
             return
         seen.add(key)
-        results.append(AnalogRepeaterInfo(
-            name=name[:12], callsign=callsign, rx_freq=rx, tx_freq=tx,
-            ctcss_encode=ctcss or "None", county_name=region, selected=True,
-        ))
+        raw.append({"city": city.split(",")[0].strip(), "state": state,
+                    "callsign": callsign, "rx": rx, "tx": tx,
+                    "ctcss": ctcss or "None", "region": region})
 
     # --- Source 1: local database ---
     try:
         conn = repeater_db.get_connection()
         unique_states = list(dict.fromkeys(loc.state for loc in req.locations))
-        for state in unique_states:
-            db_rows = repeater_db.search_analog(conn, state=state)
+        for st in unique_states:
+            db_rows = repeater_db.search_analog(conn, state=st)
             for r in db_rows:
-                name = r.callsign or f"{r.rx_freq:.4f}"
-                _add(name, r.callsign, r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.city or state)
+                _add(r.city or st, r.state or st, r.callsign, r.rx_freq, r.tx_freq,
+                     r.ctcss_encode or "None", r.city or st)
         conn.close()
     except Exception as e:
         print(f"[search-analog] DB error: {e}")
@@ -235,14 +249,45 @@ async def search_analog(req: SearchAnalogRequest):
     creds = radioreference.load_credentials()
     if creds:
         try:
-            locations = [(loc.city, loc.state) for loc in req.locations]
-            rr_repeaters = radioreference.search_analog_repeaters(locations, creds)
-            for r in rr_repeaters:
-                _add(r.name, r.callsign, r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.county_name)
+            for loc in req.locations:
+                rr_repeaters = radioreference.search_analog_repeaters(
+                    [(loc.city, loc.state)], creds
+                )
+                for r in rr_repeaters:
+                    _add(r.county_name or loc.city, loc.state, r.callsign,
+                         r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.county_name)
         except Exception as e:
             print(f"[search-analog] RadioReference error: {e}")
 
-    results.sort(key=lambda r: (r.county_name, r.rx_freq))
+    raw.sort(key=lambda r: (r["state"], r["rx"]))
+
+    # Assign names: city abbreviation, with freq suffix when city has duplicates
+    city_counts: dict[str, int] = {}
+    for e in raw:
+        city_counts[e["city"]] = city_counts.get(e["city"], 0) + 1
+
+    used_names: set[str] = set()
+    results: list[AnalogRepeaterInfo] = []
+    for e in raw:
+        abbrev = _city_abbrev(e["city"])
+        if city_counts[e["city"]] > 1:
+            freq_suffix = f"{round(e['rx'] % 1 * 1000) % 1000:03d}"
+            base = (abbrev[: 12 - len(freq_suffix)] + freq_suffix)
+        else:
+            base = abbrev[:12]
+
+        # Final collision guard (shouldn't normally fire)
+        name, counter = base, 2
+        while name in used_names:
+            name = f"{base[:12 - len(str(counter))]}{counter}"
+            counter += 1
+        used_names.add(name)
+
+        results.append(AnalogRepeaterInfo(
+            name=name, callsign=e["callsign"], rx_freq=e["rx"], tx_freq=e["tx"],
+            ctcss_encode=e["ctcss"], county_name=e["region"], state=e["state"], selected=True,
+        ))
+
     return {"repeaters": results}
 
 
@@ -347,12 +392,14 @@ async def generate(req: GenerateRequest):
     if not repeaters:
         raise HTTPException(status_code=400, detail="No repeaters selected")
 
-    # BM data
-    bm_talkgroups: dict[int, str] = {}
+    # BM data — use CSV catalog as primary TG name source; API for device verification
+    bm_talkgroups: dict[int, str] = dict(_BM_TG_NAMES)  # CSV names
     bm_key = brandmeister._load_api_key()
     bm_index: dict = {}
     if bm_key:
-        bm_talkgroups = brandmeister.get_all_talkgroups(bm_key)
+        # Merge API names (API wins for any overlap, but CSV covers most)
+        api_names = brandmeister.get_all_talkgroups(bm_key)
+        bm_talkgroups.update(api_names)
         devices = brandmeister.get_all_devices(bm_key)
         if devices:
             bm_index = brandmeister.build_repeater_index(devices)
@@ -400,7 +447,40 @@ async def generate(req: GenerateRequest):
     builder = CodeplugBuilder(cp_req, bm_talkgroups=bm_talkgroups)
     codeplug = builder.build(repeaters)
 
-    # Inject manually entered hotspot talkgroups
+    # --- Reorganize hotspot into per-category zones ---
+    # The builder created a single "Hotspot" zone; replace it with category zones.
+    _tg_category: dict[int, str] = {
+        tg["id"]: cat
+        for cat, tgs in _BM_CATALOG.items()
+        for tg in tgs
+    }
+    _contact_to_tgid: dict[str, int] = {c.name: c.dmr_id for c in codeplug.contacts}
+
+    hotspot_zone = next((z for z in codeplug.zones if z.name == "Hotspot"), None)
+    if hotspot_zone:
+        codeplug.zones.remove(hotspot_zone)
+        # Group channel names by category, preserving order
+        hs_cat_channels: dict[str, list[str]] = {}
+        for ch_name in hotspot_zone.channels:
+            ch = next((c for c in codeplug.channels if c.name == ch_name), None)
+            if ch:
+                tg_id = _contact_to_tgid.get(ch.tx_contact)
+                cat = _tg_category.get(tg_id, "Wide Area") if tg_id else "Wide Area"
+                hs_cat_channels.setdefault(cat, []).append(ch_name)
+        # Emit zones in category order, splitting at 64
+        for cat in bm_catalog_mod.CATEGORY_ORDER:
+            ch_names = hs_cat_channels.get(cat, [])
+            if not ch_names:
+                continue
+            base = bm_catalog_mod.CATEGORY_ZONE_NAMES.get(cat, f"HS {cat}")[:16]
+            for page_idx, offset in enumerate(range(0, len(ch_names), 64)):
+                suffix = "" if page_idx == 0 else str(page_idx + 1)
+                codeplug.zones.append(Zone(
+                    name=(base + suffix)[:16],
+                    channels=ch_names[offset:offset + 64],
+                ))
+
+    # Inject manually entered hotspot talkgroups into "HS Manual TGs"
     if req.manual_hotspot_tgs:
         existing_contact_names = {c.name for c in codeplug.contacts}
         existing_channel_names = {c.name for c in codeplug.channels}
@@ -432,23 +512,43 @@ async def generate(req: GenerateRequest):
                 existing_channel_names.add(name)
                 new_channels.append(name)
 
-        # Add to the Hotspot zone, or create it if none exists yet
         if new_channels:
-            hotspot_zone = next((z for z in codeplug.zones if z.name == "Hotspot"), None)
-            if hotspot_zone:
-                hotspot_zone.channels.extend(new_channels)
-            else:
-                codeplug.zones.append(Zone(name="Hotspot", channels=new_channels))
+            for page_idx, offset in enumerate(range(0, len(new_channels), 64)):
+                suffix = "" if page_idx == 0 else str(page_idx + 1)
+                codeplug.zones.append(Zone(
+                    name=f"HS Manual TGs{suffix}"[:16],
+                    channels=new_channels[offset:offset + 64],
+                ))
 
-    # Inject selected analog repeaters into an "Analog" zone
+    # Inject selected analog repeaters into per-state/band zones
+    # Zone naming: "{ST} 2m Analog", "{ST} 70cm Analog"; overflow: "{ST} 2m Analog2"
     if req.selected_analog:
         existing_channel_names = {c.name for c in codeplug.channels}
-        analog_channel_names: list[str] = []
+        # Group channel names by (state_abbrev, band)
+        zone_channels: dict[tuple[str, str], list[str]] = {}
+
+        def _state_abbrev(state_full: str) -> str:
+            abbrevs = {
+                "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR",
+                "California":"CA","Colorado":"CO","Connecticut":"CT","Delaware":"DE",
+                "Florida":"FL","Georgia":"GA","Hawaii":"HI","Idaho":"ID",
+                "Illinois":"IL","Indiana":"IN","Iowa":"IA","Kansas":"KS",
+                "Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD",
+                "Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS",
+                "Missouri":"MO","Montana":"MT","Nebraska":"NE","Nevada":"NV",
+                "New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM","New York":"NY",
+                "North Carolina":"NC","North Dakota":"ND","Ohio":"OH","Oklahoma":"OK",
+                "Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC",
+                "South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT",
+                "Vermont":"VT","Virginia":"VA","Washington":"WA","West Virginia":"WV",
+                "Wisconsin":"WI","Wyoming":"WY","District of Columbia":"DC",
+            }
+            return abbrevs.get(state_full, state_full[:2].upper())
+
         for ar in req.selected_analog:
             name = ar.name.strip()[:12]
             if not name:
                 continue
-            # Disambiguate duplicate names
             base, counter = name, 2
             while name in existing_channel_names:
                 name = f"{base[:12 - len(str(counter))]}{counter}"
@@ -468,9 +568,17 @@ async def generate(req: GenerateRequest):
                 ctcss_decode = "None",
                 ctcss_encode = ar.ctcss_encode,
             ))
-            analog_channel_names.append(name)
-        if analog_channel_names:
-            codeplug.zones.append(Zone(name="Analog", channels=analog_channel_names[:64]))
+            st = _state_abbrev(ar.state) if ar.state else "XX"
+            band = "2m" if 144 <= ar.rx_freq < 148 else "70cm"
+            zone_channels.setdefault((st, band), []).append(name)
+
+        # Build zones, splitting into pages of 64
+        for (st, band), ch_names in sorted(zone_channels.items()):
+            for page_idx, offset in enumerate(range(0, len(ch_names), 64)):
+                page = ch_names[offset:offset + 64]
+                suffix = "" if page_idx == 0 else str(page_idx + 1)
+                zone_name = f"{st} {band} Analog{suffix}"
+                codeplug.zones.append(Zone(name=zone_name, channels=page))
 
     warnings = codeplug.validate()
     if warnings:
@@ -483,3 +591,8 @@ async def generate(req: GenerateRequest):
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="codeplug_{req.callsign}.zip"'},
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

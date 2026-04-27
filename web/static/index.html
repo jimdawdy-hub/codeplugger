@@ -9,7 +9,7 @@
       --bg: #0a0a0f;
       --card: #16161d;
       --text: #e8e8f0;
-      --muted: #8b8b9e;
+      --muted: #d8d8e8;
       --accent: #ff6b35;
       --accent-hover: #ff8555;
       --success: #22c55e;
@@ -19,6 +19,7 @@
       --radius: 8px;
     }
     * { box-sizing: border-box; }
+    html { font-size: 120%; }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -126,19 +127,31 @@
       background: #1e1e28;
       padding: 0.6rem 0.9rem;
       cursor: pointer;
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; gap: 0.6rem;
       font-weight: 600; font-size: 0.95rem;
       user-select: none;
     }
     .tg-group-header:hover { background: #252532; }
-    .tg-group-header::after { content: "▸"; font-size: 0.9rem; transition: transform 0.2s; }
-    .tg-group.open .tg-group-header::after { transform: rotate(90deg); }
+    .tg-group-header .chevron { margin-left: auto; transition: transform 0.2s; }
+    .tg-group.open .tg-group-header .chevron { transform: rotate(90deg); }
     .tg-group-body { display: none; padding: 0.75rem; }
     .tg-group.open .tg-group-body { display: block; }
-    .tg-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+    /* Country sub-groups within Countries category */
+    .tg-subgroup { margin: 0.25rem 0; border: 1px solid #2a2a3a; border-radius: 6px; overflow: hidden; }
+    .tg-subgroup-header {
+      background: #12121a; padding: 0.4rem 0.7rem;
+      display: flex; align-items: center; gap: 0.5rem; cursor: pointer;
+      font-size: 0.9rem; font-weight: 600; user-select: none;
+    }
+    .tg-subgroup-header:hover { background: #1a1a24; }
+    .tg-subgroup-header .chevron { margin-left: auto; transition: transform 0.2s; font-size: 0.8rem; }
+    .tg-subgroup.open .tg-subgroup-header .chevron { transform: rotate(90deg); }
+    .tg-subgroup-body { display: none; padding: 0.4rem 0.7rem 0.5rem 1.2rem; }
+    .tg-subgroup.open .tg-subgroup-body { display: block; }
+    .tg-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
     .tg-item input { margin: 0; }
-    .tg-item span { font-size: 0.9rem; }
-    .tg-item .tg-id { color: var(--muted); font-size: 0.8rem; font-family: monospace; }
+    .tg-item span { font-size: 0.88rem; }
+    .tg-item .tg-id { color: var(--muted); font-size: 0.78rem; font-family: monospace; }
     .tg-search { margin-bottom: 0.75rem; }
 
     /* Disclaimer */
@@ -288,7 +301,7 @@
     <!-- STEP 4b: Analog Repeaters -->
     <div class="step" id="step4b">
       <h2><span class="step-number">4b</span> Analog Repeaters</h2>
-      <p class="muted">FM repeaters from RadioReference for your locations. All go into a single "Analog" zone. CTCSS encode-only (standard ham practice).</p>
+      <p class="muted">FM repeaters for your locations. Grouped into zones by state and band (e.g. "IL 2m Analog", "IL 70cm Analog"). CTCSS encode-only (standard ham practice).</p>
       <button onclick="searchAnalog()" id="btnAnalog">Search Analog Repeaters</button>
       <div id="analogResults" class="hidden mt-1">
         <p class="muted mb-1">Select the analog repeaters to include.</p>
@@ -551,10 +564,13 @@
     // -------------------------------------------------------------------------
     // Step 5: Hotspot Talkgroups
     // -------------------------------------------------------------------------
+    let tgCategoryOrder = [];
+
     async function loadTalkgroups() {
       try {
         const data = await api('/api/hotspot-talkgroups');
         tgData = data.groups || {};
+        tgCategoryOrder = data.category_order || Object.keys(tgData);
         renderTalkgroups();
       } catch (e) {
         setError('tgError', e || 'Failed to load talkgroups');
@@ -565,34 +581,100 @@
       const container = qs('#tgContainer');
       container.innerHTML = '';
       const flt = filter.toLowerCase();
-      Object.keys(tgData).forEach(groupName => {
-        const items = tgData[groupName].filter(t =>
+
+      tgCategoryOrder.forEach(groupName => {
+        const allItems = tgData[groupName] || [];
+        const items = allItems.filter(t =>
           !flt || t.name.toLowerCase().includes(flt) || String(t.id).includes(flt)
         );
         if (!items.length && flt) return;
 
         const div = document.createElement('div');
         div.className = 'tg-group';
+        div.dataset.group = groupName;
+
+        // Select-all checkbox for the whole group
+        const saId = `sa-${groupName.replace(/\s+/g,'_')}`;
+
+        let bodyHtml;
+        if (groupName === 'Countries' && !flt) {
+          // Sub-group by country code
+          const byCountry = {};
+          items.forEach(t => {
+            const c = t.country || 'XX';
+            (byCountry[c] = byCountry[c] || []).push(t);
+          });
+          const sortedCountries = Object.keys(byCountry).sort();
+          bodyHtml = sortedCountries.map(cc => {
+            const ctgs = byCountry[cc];
+            const ccId = `cc-${cc}`;
+            const countryName = ctgs[0].name.split(' ')[0]; // rough label
+            return `<div class="tg-subgroup" id="sg-${cc}">
+              <div class="tg-subgroup-header" onclick="toggleSubGroup('${cc}')">
+                <input type="checkbox" class="tg-country-all" data-country="${cc}"
+                       onclick="event.stopPropagation(); toggleCountryAll(this)">
+                <span>${escapeHtml(cc)} — ${escapeHtml(ctgs[0].name)} (${ctgs.length})</span>
+                <span class="chevron">▸</span>
+              </div>
+              <div class="tg-subgroup-body" id="sgb-${cc}">
+                ${ctgs.map(t => `<label class="tg-item">
+                  <input type="checkbox" class="tg-cb" data-group="${escapeHtml(groupName)}"
+                         data-country="${cc}" value="${t.id}" data-name="${escapeHtml(t.name)}">
+                  <span>${escapeHtml(t.name)}</span>
+                  <span class="tg-id">(${t.id})</span>
+                </label>`).join('')}
+              </div>
+            </div>`;
+          }).join('');
+        } else {
+          bodyHtml = items.map(t => `<label class="tg-item">
+            <input type="checkbox" class="tg-cb" data-group="${escapeHtml(groupName)}"
+                   value="${t.id}" data-name="${escapeHtml(t.name)}">
+            <span>${escapeHtml(t.name)}</span>
+            <span class="tg-id">(${t.id})</span>
+          </label>`).join('');
+        }
+
         div.innerHTML = `
-          <div class="tg-group-header" onclick="toggleTGGroup(this)">
-            <span>${escapeHtml(groupName)} <span class="muted">(${items.length})</span></span>
+          <div class="tg-group-header" onclick="toggleTGGroup(this.parentElement)">
+            <input type="checkbox" id="${saId}" class="tg-group-all" data-group="${escapeHtml(groupName)}"
+                   onclick="event.stopPropagation(); toggleGroupAll(this)">
+            <label for="${saId}" style="margin:0;font-weight:600;cursor:pointer"
+                   onclick="event.stopPropagation()">
+              Select All
+            </label>
+            <span style="margin-left:0.5rem">${escapeHtml(groupName)}
+              <span style="font-weight:400;color:var(--muted)">(${items.length})</span>
+            </span>
+            <span class="chevron">▸</span>
           </div>
-          <div class="tg-group-body">
-            ${items.map(t => `
-              <label class="tg-item">
-                <input type="checkbox" class="tg-cb" value="${t.id}" data-name="${escapeHtml(t.name)}">
-                <span>${escapeHtml(t.name)}</span>
-                <span class="tg-id">(${t.id})</span>
-              </label>
-            `).join('')}
-          </div>
+          <div class="tg-group-body">${bodyHtml}</div>
         `;
         container.appendChild(div);
       });
     }
 
-    function toggleTGGroup(header) {
-      header.parentElement.classList.toggle('open');
+    function toggleTGGroup(groupEl) {
+      groupEl.classList.toggle('open');
+    }
+
+    function toggleSubGroup(cc) {
+      const sg = document.getElementById(`sg-${cc}`);
+      if (sg) sg.classList.toggle('open');
+    }
+
+    function toggleGroupAll(cb) {
+      const group = cb.dataset.group;
+      const checked = cb.checked;
+      qsa(`.tg-cb[data-group="${group}"]`).forEach(c => c.checked = checked);
+      // Also update any country-level Select All boxes
+      qsa(`.tg-country-all`).forEach(c => c.checked = checked);
+    }
+
+    function toggleCountryAll(cb) {
+      const cc = cb.dataset.country;
+      const checked = cb.checked;
+      qsa(`.tg-cb[data-country="${cc}"]`).forEach(c => c.checked = checked);
     }
 
     function filterTGs() {
@@ -660,7 +742,8 @@
       return Array.from(qsa('.analog-cb:checked')).map(cb => {
         const r = analogData[parseInt(cb.dataset.idx)];
         return { name: r.name, callsign: r.callsign, rx_freq: r.rx_freq,
-                 tx_freq: r.tx_freq, ctcss_encode: r.ctcss_encode };
+                 tx_freq: r.tx_freq, ctcss_encode: r.ctcss_encode,
+                 state: r.state || '' };
       });
     }
 

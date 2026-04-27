@@ -40,7 +40,7 @@ def _parse_description(desc: str) -> tuple[str, float, Optional[str], bool]:
     """
     Parse a KML description string.
 
-    Returns (city, rx_freq, ctcss, on_air).
+    Returns (city, rx_freq, ctcss).
     rx_freq = 0.0 if unparseable.
     """
     # Strip CDATA and HTML tags
@@ -49,15 +49,12 @@ def _parse_description(desc: str) -> tuple[str, float, Optional[str], bool]:
     text = re.sub(r'\s+', ' ', text).strip()
 
     # "City  147.03000+ 103.5  On-air: Yes ..."
-    # Freq pattern: digits.digits followed by + or -
-    freq_match = re.search(r'(\d{2,3}\.\d+)([+-])\s*([\d.]+)?\s*(On-air:\s*(Yes|No))?', text)
+    freq_match = re.search(r'(\d{2,3}\.\d+)([+-])\s*([\d.]+)?', text)
     if not freq_match:
-        return text[:40], 0.0, None, False
+        return text[:40], 0.0, None
 
-    rx_freq = float(freq_match.group(1))
-    sign    = freq_match.group(2)
+    rx_freq   = float(freq_match.group(1))
     ctcss_raw = (freq_match.group(3) or "").strip()
-    on_air  = freq_match.group(5) == "Yes" if freq_match.group(5) else True
 
     # City is everything before the frequency
     city = text[:freq_match.start()].strip().split('<br>')[0].strip()
@@ -65,7 +62,7 @@ def _parse_description(desc: str) -> tuple[str, float, Optional[str], bool]:
 
     ctcss = ctcss_raw if ctcss_raw and float(ctcss_raw) > 0 else None
 
-    return city, rx_freq, ctcss, on_air
+    return city, rx_freq, ctcss
 
 
 def _parse_kml_content(kml_text: str, state: str, band: str, source_tag: str) -> list[dict]:
@@ -87,9 +84,9 @@ def _parse_kml_content(kml_text: str, state: str, band: str, source_tag: str) ->
             continue
 
         callsign = (name_el.text or "").strip()
-        city, rx_freq, ctcss, on_air = _parse_description(desc_el.text or "")
+        city, rx_freq, ctcss = _parse_description(desc_el.text or "")
 
-        if not on_air or rx_freq == 0.0:
+        if rx_freq == 0.0:
             continue
 
         # Calculate tx freq from sign embedded in description
