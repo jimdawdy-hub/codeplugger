@@ -2,13 +2,10 @@
 Local repeater database — SQLite-backed, multi-source.
 
 Data flows in from:
+  - KML/KMZ imports (Google Earth Ham Repeaters project — RepeaterBook data)
   - PDF imports (Iowa RC, MN RC, WPRC, Oregon, Rochester area, etc.)
-  - KML/KMZ imports (Google Earth Ham Repeaters project)
-  - RadioReference API (county-level amateur radio frequencies)
-  - RadioID API (DMR digital repeaters)
 
-Query by state/city for use in analog repeater search when
-RadioReference county mapping is unavailable.
+Queried by state for analog repeater search.
 """
 
 import sqlite3
@@ -26,7 +23,7 @@ DB_PATH = pathlib.Path(__file__).resolve().parent.parent / "data" / "repeaters.d
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS repeaters (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    source        TEXT    NOT NULL,        -- e.g. 'pdf:iowa_rc', 'kml:illinois', 'radioreference'
+    source        TEXT    NOT NULL,        -- e.g. 'pdf:iowa_rc', 'kml:illinois'
     callsign      TEXT,
     city          TEXT,
     state         TEXT,

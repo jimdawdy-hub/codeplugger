@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 
-from codeplug import radioid, csv_export, brandmeister, radioreference
+from codeplug import radioid, csv_export, brandmeister
 from codeplug import repeater_db
 from codeplug import bm_talkgroups as bm_catalog_mod
 from codeplug.builder import CodeplugBuilder
@@ -33,9 +33,6 @@ _BM_CATALOG: dict = bm_catalog_mod.load_catalog()
 _BM_TG_NAMES: dict[int, str] = bm_catalog_mod.load_tg_names()
 
 app = FastAPI(title="CODEPLUGGER")
-
-# Reverse map of RadioReference stid → state name (used by zip lookup response)
-_STID_TO_NAME: dict[int, str] = {v: k for k, v in radioreference._STATE_IDS.items()}
 
 # RadioID ipsc_network spellings are self-reported and wildly inconsistent.
 # Each key is the canonical UI label; the list covers all observed variants.
@@ -186,21 +183,6 @@ async def lookup_user(req: LookupUserRequest):
     )
 
 
-@app.get("/api/lookup-zip/{zip_code}")
-async def lookup_zip(zip_code: str):
-    """Convert a US zip code to city, state, and coordinates."""
-    creds = radioreference.load_credentials()
-    if not creds:
-        raise HTTPException(status_code=503, detail="RadioReference credentials not configured")
-    info = radioreference.get_zip_info(zip_code, creds)
-    if not info:
-        raise HTTPException(status_code=404, detail=f"Zip code {zip_code} not found")
-    # Map RR state ID back to state name
-    state_name = _STID_TO_NAME.get(info.stid, "")
-    return {"zip": zip_code, "city": info.city, "state": state_name,
-            "lat": info.lat, "lon": info.lon, "stid": info.stid, "ctid": info.ctid}
-
-
 def _city_abbrev(city: str, max_len: int = 12) -> str:
     """Strip punctuation/spaces from a city name, truncate to max_len."""
     import re
@@ -210,11 +192,8 @@ def _city_abbrev(city: str, max_len: int = 12) -> str:
 @app.post("/api/search-analog")
 async def search_analog(req: SearchAnalogRequest):
     """
-    Return analog FM amateur repeaters for the given locations.
-
-    Sources (merged and deduplicated):
-      1. Local database (KML/PDF imports — broadest coverage)
-      2. RadioReference API county-level search (real-time, where county ID is known)
+    Return analog FM amateur repeaters for the selected states from the local
+    repeater database (built from RepeaterBook KML and regional PDF directories).
 
     Channel names use city name (like DMR repeaters), with a 3-digit frequency
     suffix appended when multiple repeaters share the same city name.
@@ -250,21 +229,6 @@ async def search_analog(req: SearchAnalogRequest):
         conn.close()
     except Exception as e:
         print(f"[search-analog] DB error: {e}")
-
-    # --- Source 2: RadioReference API ---
-    creds = radioreference.load_credentials()
-    if creds:
-        try:
-            unique_states_rr = list(dict.fromkeys(loc.state for loc in req.locations if loc.state))
-            for st in unique_states_rr:
-                rr_repeaters = radioreference.search_analog_repeaters(
-                    [("", st)], creds
-                )
-                for r in rr_repeaters:
-                    _add(r.county_name or st, st, r.callsign,
-                         r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.county_name)
-        except Exception as e:
-            print(f"[search-analog] RadioReference error: {e}")
 
     raw.sort(key=lambda r: (r["state"], r["rx"]))
 
