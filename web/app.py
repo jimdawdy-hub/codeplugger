@@ -452,12 +452,15 @@ async def generate(req: GenerateRequest):
     }
     _contact_to_tgid: dict[str, int] = {c.name: c.dmr_id for c in codeplug.contacts}
 
+    # Disconnect channel name (TG 4000) — every HS zone gets this as last slot.
+    # Initialized to None; sourced from the builder's hotspot zone if present,
+    # otherwise created on demand below when manual TGs are added.
+    disc_ch_name: str | None = None
+
     hotspot_zone = next((z for z in codeplug.zones if z.name == "Hotspot"), None)
     if hotspot_zone:
         codeplug.zones.remove(hotspot_zone)
 
-        # Find the disconnect channel name (TG 4000) — added by the builder
-        disc_ch_name: str | None = None
         for ch_name in hotspot_zone.channels:
             ch = next((c for c in codeplug.channels if c.name == ch_name), None)
             if ch and _contact_to_tgid.get(ch.tx_contact) == 4000:
@@ -524,11 +527,31 @@ async def generate(req: GenerateRequest):
                 new_channels.append(name)
 
         if new_channels:
-            # Manual zone also gets disconnect as last channel
+            # Manual zone always ends with disconnect — create one if the
+            # builder didn't (case: manual TGs only, no catalog TGs selected).
+            if not disc_ch_name:
+                disc_ch_name = "HS Disc"
+                if disc_ch_name not in {c.name for c in codeplug.contacts}:
+                    codeplug.contacts.append(Contact(
+                        name=disc_ch_name, dmr_id=4000, call_type="Group Call"
+                    ))
+                if disc_ch_name not in {c.name for c in codeplug.channels}:
+                    codeplug.channels.append(Channel(
+                        name=disc_ch_name,
+                        channel_type="Digital",
+                        rx_freq=req.hotspot_freq,
+                        tx_freq=req.hotspot_freq,
+                        color_code=1,
+                        timeslot=2,
+                        tx_contact=disc_ch_name,
+                        rx_group="None",
+                        power="Low",
+                        tx_admit="Always",
+                        dmr_id=req.callsign,
+                    ))
+
             for page_idx, offset in enumerate(range(0, len(new_channels), 63)):
-                page = new_channels[offset:offset + 63]
-                if disc_ch_name:
-                    page = page + [disc_ch_name]
+                page = new_channels[offset:offset + 63] + [disc_ch_name]
                 suffix = "" if page_idx == 0 else str(page_idx + 1)
                 codeplug.zones.append(Zone(
                     name=f"HS Manual TGs{suffix}"[:16],
