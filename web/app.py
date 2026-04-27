@@ -249,12 +249,13 @@ async def search_analog(req: SearchAnalogRequest):
     creds = radioreference.load_credentials()
     if creds:
         try:
-            for loc in req.locations:
+            unique_states_rr = list(dict.fromkeys(loc.state for loc in req.locations if loc.state))
+            for st in unique_states_rr:
                 rr_repeaters = radioreference.search_analog_repeaters(
-                    [(loc.city, loc.state)], creds
+                    [("", st)], creds
                 )
                 for r in rr_repeaters:
-                    _add(r.county_name or loc.city, loc.state, r.callsign,
+                    _add(r.county_name or st, st, r.callsign,
                          r.rx_freq, r.tx_freq, r.ctcss_encode or "None", r.county_name)
         except Exception as e:
             print(f"[search-analog] RadioReference error: {e}")
@@ -295,29 +296,21 @@ async def search_analog(req: SearchAnalogRequest):
 async def search_repeaters(req: SearchRepeatersRequest):
     api_networks = _expand_networks(req.networks)
 
-    # Search repeaters per location (no per-state caps in web UI — user selects)
-    seen_callsigns: set[str] = set()
-    state_searched: set[str] = set()
+    # Search by state only — one query per unique state, user selects from results
+    # Deduplicate by (callsign, rx_freq) — same trustee can have multiple repeaters
+    seen: set[tuple] = set()
     all_repeaters: list[Repeater] = []
+    unique_states = list(dict.fromkeys(loc.state for loc in req.locations if loc.state))
 
-    for loc in req.locations:
-        city, state = loc.city, loc.state
+    for state in unique_states:
         found = radioid.search_repeaters(
-            state=state, city=city, country=req.country, networks=api_networks
+            state=state, country=req.country, networks=api_networks
         )
-        # State fallback when city returns < 3
-        if len(found) < 3 and state not in state_searched:
-            state_found = radioid.search_repeaters(
-                state=state, country=req.country, networks=api_networks
-            )
-            state_searched.add(state)
-            for r in state_found:
-                if r.callsign not in seen_callsigns:
-                    found.append(r)
         for r in found:
-            if r.callsign not in seen_callsigns:
+            key = (r.callsign.upper(), round(r.rx_freq, 4))
+            if key not in seen:
                 all_repeaters.append(r)
-                seen_callsigns.add(r.callsign)
+                seen.add(key)
 
     # BM verification
     bm_index: dict = {}
@@ -361,33 +354,30 @@ async def generate(req: GenerateRequest):
     if not req.initials or len(req.initials.strip()) < 2:
         raise HTTPException(status_code=400, detail="Initials required")
 
-    # Re-fetch repeaters (same logic as search)
+    # Re-fetch repeaters by state only (mirrors search endpoint)
     api_networks = _expand_networks(req.networks)
 
-    seen_callsigns: set[str] = set()
-    state_searched: set[str] = set()
+    seen: set[tuple] = set()
     all_repeaters: list[Repeater] = []
+    unique_states = list(dict.fromkeys(loc.state for loc in req.locations if loc.state))
 
-    for loc in req.locations:
+    for state in unique_states:
         found = radioid.search_repeaters(
-            state=loc.state, city=loc.city, country=req.country, networks=api_networks
+            state=state, country=req.country, networks=api_networks
         )
-        if len(found) < 3 and loc.state not in state_searched:
-            state_found = radioid.search_repeaters(
-                state=loc.state, country=req.country, networks=api_networks
-            )
-            state_searched.add(loc.state)
-            for r in state_found:
-                if r.callsign not in seen_callsigns:
-                    found.append(r)
         for r in found:
-            if r.callsign not in seen_callsigns:
+            key = (r.callsign.upper(), round(r.rx_freq, 4))
+            if key not in seen:
                 all_repeaters.append(r)
-                seen_callsigns.add(r.callsign)
+                seen.add(key)
 
     # Filter to selected
-    selected_set = {c.upper() for c in req.selected_repeaters}
-    repeaters = [r for r in all_repeaters if r.callsign.upper() in selected_set]
+    # selected_repeaters is "CALLSIGN:freq" keys (e.g. "N9IAA:444.35000")
+    selected_set = {s.upper() for s in req.selected_repeaters}
+    repeaters = [
+        r for r in all_repeaters
+        if f"{r.callsign.upper()}:{r.rx_freq:.5f}" in selected_set
+    ]
 
     if not repeaters:
         raise HTTPException(status_code=400, detail="No repeaters selected")

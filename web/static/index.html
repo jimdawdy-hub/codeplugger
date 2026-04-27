@@ -233,30 +233,41 @@
       <div id="lookupError" class="error hidden"></div>
     </div>
 
-    <!-- STEP 2: Locations -->
+    <!-- STEP 2: States -->
     <div class="step" id="step2">
-      <h2><span class="step-number">2</span> Locations</h2>
-      <p class="muted">Add one or more city/state pairs. Each row is searched independently — add a separate row for each area you want covered.</p>
-      <div class="row mb-1">
-        <div style="flex:0 0 160px">
-          <label for="zipLookup">Add by Zip Code</label>
-          <input type="text" id="zipLookup" placeholder="e.g. 46311" maxlength="5">
+      <h2><span class="step-number">2</span> States</h2>
+      <p class="muted">Select one or more states to search. All repeaters in each state will be returned — you choose which ones to include.</p>
+      <div class="row mb-1" style="align-items:flex-end;gap:0.5rem">
+        <div style="flex:1">
+          <label for="stateSelect">Add a State</label>
+          <select id="stateSelect">
+            <option value="">— choose state —</option>
+            <option>Alabama</option><option>Alaska</option><option>Arizona</option>
+            <option>Arkansas</option><option>California</option><option>Colorado</option>
+            <option>Connecticut</option><option>Delaware</option>
+            <option>District of Columbia</option><option>Florida</option>
+            <option>Georgia</option><option>Hawaii</option><option>Idaho</option>
+            <option>Illinois</option><option>Indiana</option><option>Iowa</option>
+            <option>Kansas</option><option>Kentucky</option><option>Louisiana</option>
+            <option>Maine</option><option>Maryland</option><option>Massachusetts</option>
+            <option>Michigan</option><option>Minnesota</option><option>Mississippi</option>
+            <option>Missouri</option><option>Montana</option><option>Nebraska</option>
+            <option>Nevada</option><option>New Hampshire</option><option>New Jersey</option>
+            <option>New Mexico</option><option>New York</option>
+            <option>North Carolina</option><option>North Dakota</option>
+            <option>Ohio</option><option>Oklahoma</option><option>Oregon</option>
+            <option>Pennsylvania</option><option>Rhode Island</option>
+            <option>South Carolina</option><option>South Dakota</option>
+            <option>Tennessee</option><option>Texas</option><option>Utah</option>
+            <option>Vermont</option><option>Virginia</option><option>Washington</option>
+            <option>West Virginia</option><option>Wisconsin</option><option>Wyoming</option>
+          </select>
         </div>
         <div class="btn-inline">
-          <button class="secondary" onclick="addByZip()" id="btnZip">Look Up Zip</button>
-        </div>
-        <div style="flex:1; align-self:flex-end">
-          <span id="zipMsg" class="muted"></span>
+          <button class="secondary" onclick="addState()">+ Add State</button>
         </div>
       </div>
-      <div id="locationsList">
-        <div class="row location-row">
-          <div><input type="text" class="loc-city" placeholder="City" value="Chicago"></div>
-          <div><input type="text" class="loc-state" placeholder="State" value="Illinois"></div>
-          <div class="btn-inline"><button class="secondary" onclick="removeLocation(this)">✕</button></div>
-        </div>
-      </div>
-      <button class="secondary mt-1" onclick="addLocation()">+ Add Location</button>
+      <div id="statesList"></div>
     </div>
 
     <!-- STEP 3: Networks -->
@@ -323,7 +334,7 @@
         </div>
       </div>
       <div id="analogError" class="error hidden"></div>
-      <p class="muted mt-1" style="font-size:0.8rem">Coverage depends on city-to-county mapping. For best results, use zip code lookup in step 2.</p>
+      <p class="muted mt-1" style="font-size:0.8rem">Coverage uses the local repeater database plus RadioReference county data for the selected states.</p>
     </div>
 
     <!-- STEP 5: Hotspot Talkgroups -->
@@ -459,60 +470,44 @@
     }
 
     // -------------------------------------------------------------------------
-    // Step 2: Locations
+    // Step 2: States
     // -------------------------------------------------------------------------
-    function addLocation(city='', state='') {
-      const div = document.createElement('div');
-      div.className = 'row location-row';
-      div.innerHTML = `
-        <div><input type="text" class="loc-city" placeholder="City" value="${city}"></div>
-        <div><input type="text" class="loc-state" placeholder="State" value="${state}"></div>
-        <div class="btn-inline"><button class="secondary" onclick="removeLocation(this)">✕</button></div>
-      `;
-      qs('#locationsList').appendChild(div);
-    }
-    function removeLocation(btn) {
-      const rows = qsa('.location-row');
-      if (rows.length <= 1) return; // keep at least one
-      btn.closest('.location-row').remove();
-    }
+    function addState(stateName) {
+      const name = stateName || qs('#stateSelect').value;
+      if (!name) return;
+      // Prevent duplicates
+      const existing = Array.from(qsa('.state-tag')).map(t => t.dataset.state);
+      if (existing.includes(name)) return;
 
-    // -------------------------------------------------------------------------
-    // Step 2: Zip lookup
-    // -------------------------------------------------------------------------
-    async function addByZip() {
-      const zip = qs('#zipLookup').value.trim();
-      if (!/^\d{5}$/.test(zip)) { qs('#zipMsg').textContent = 'Enter a 5-digit zip'; return; }
-      qs('#btnZip').disabled = true;
-      qs('#zipMsg').textContent = 'Looking up...';
-      try {
-        const data = await fetch(`/api/lookup-zip/${zip}`).then(r => {
-          if (!r.ok) return r.json().then(j => Promise.reject(j.detail || r.statusText));
-          return r.json();
-        });
-        addLocation(data.city, data.state);
-        qs('#zipLookup').value = '';
-        qs('#zipMsg').textContent = `✓ Added ${data.city}, ${data.state}`;
-        setTimeout(() => { qs('#zipMsg').textContent = ''; }, 3000);
-      } catch (e) {
-        qs('#zipMsg').textContent = e || 'Lookup failed';
-      } finally {
-        qs('#btnZip').disabled = false;
-      }
+      const div = document.createElement('div');
+      div.className = 'row state-tag';
+      div.dataset.state = name;
+      div.style.cssText = 'align-items:center;gap:0.5rem;padding:0.3rem 0;';
+      div.innerHTML = `<span style="flex:1;font-weight:500">${escapeHtml(name)}</span>
+        <button class="secondary" style="padding:0.2rem 0.6rem" onclick="removeState(this)">✕</button>`;
+      qs('#statesList').appendChild(div);
+      qs('#stateSelect').value = '';
     }
+    function removeState(btn) {
+      const tags = qsa('.state-tag');
+      if (tags.length <= 1) return; // keep at least one
+      btn.closest('.state-tag').remove();
+    }
+    function getSelectedStates() {
+      return Array.from(qsa('.state-tag')).map(t => t.dataset.state);
+    }
+    // Pre-populate with Illinois and Indiana
+    addState('Illinois');
+    addState('Indiana');
 
     // -------------------------------------------------------------------------
     // Step 4: Search Repeaters
     // -------------------------------------------------------------------------
     async function searchRepeaters() {
       clearError('searchError');
-      const locations = [];
-      qsa('.location-row').forEach(row => {
-        const c = row.querySelector('.loc-city').value.trim();
-        const s = row.querySelector('.loc-state').value.trim();
-        if (c && s) locations.push({ city: c, state: s });
-      });
-      if (!locations.length) { setError('searchError', 'Add at least one location'); return; }
+      const states = getSelectedStates();
+      if (!states.length) { setError('searchError', 'Add at least one state'); return; }
+      const locations = states.map(s => ({ city: '', state: s }));
 
       const networks = Array.from(qsa('.net-cb:checked')).map(cb => cb.value);
       if (!networks.length) { setError('searchError', 'Select at least one network'); return; }
@@ -688,13 +683,9 @@
 
     async function searchAnalog() {
       clearError('analogError');
-      const locations = [];
-      qsa('.location-row').forEach(row => {
-        const c = row.querySelector('.loc-city').value.trim();
-        const s = row.querySelector('.loc-state').value.trim();
-        if (c && s) locations.push({ city: c, state: s });
-      });
-      if (!locations.length) { setError('analogError', 'Add at least one location first'); return; }
+      const states = getSelectedStates();
+      if (!states.length) { setError('analogError', 'Add at least one state first'); return; }
+      const locations = states.map(s => ({ city: '', state: s }));
 
       qs('#btnAnalog').disabled = true;
       qs('#btnAnalog').textContent = 'Searching...';
@@ -784,18 +775,17 @@
       if (!dmrId) { setError('genError', 'Enter your DMR ID'); return; }
       if (!userCallsign) { setError('genError', 'Look up your DMR ID first'); return; }
 
-      const locations = [];
-      qsa('.location-row').forEach(row => {
-        const c = row.querySelector('.loc-city').value.trim();
-        const s = row.querySelector('.loc-state').value.trim();
-        if (c && s) locations.push({ city: c, state: s });
-      });
-      if (!locations.length) { setError('genError', 'Add at least one location'); return; }
+      const states = getSelectedStates();
+      if (!states.length) { setError('genError', 'Add at least one state'); return; }
+      const locations = states.map(s => ({ city: '', state: s }));
 
       const networks = Array.from(qsa('.net-cb:checked')).map(cb => cb.value);
       if (!networks.length) { setError('genError', 'Select at least one network'); return; }
 
-      const selected = Array.from(qsa('.rep-cb:checked')).map(cb => repeaterData[cb.dataset.idx].callsign);
+      const selected = Array.from(qsa('.rep-cb:checked')).map(cb => {
+        const r = repeaterData[cb.dataset.idx];
+        return r.callsign + ':' + r.rx_freq.toFixed(5);
+      });
       if (!selected.length) { setError('genError', 'Select at least one repeater'); return; }
 
       const hotspotTgs = Array.from(qsa('.tg-cb:checked')).map(cb => parseInt(cb.value, 10));
