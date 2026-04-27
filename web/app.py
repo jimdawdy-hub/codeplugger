@@ -455,25 +455,40 @@ async def generate(req: GenerateRequest):
     hotspot_zone = next((z for z in codeplug.zones if z.name == "Hotspot"), None)
     if hotspot_zone:
         codeplug.zones.remove(hotspot_zone)
-        # Group channel names by category, preserving order
+
+        # Find the disconnect channel name (TG 4000) — added by the builder
+        disc_ch_name: str | None = None
+        for ch_name in hotspot_zone.channels:
+            ch = next((c for c in codeplug.channels if c.name == ch_name), None)
+            if ch and _contact_to_tgid.get(ch.tx_contact) == 4000:
+                disc_ch_name = ch_name
+                break
+
+        # Group content channels by category (excluding disconnect)
         hs_cat_channels: dict[str, list[str]] = {}
         for ch_name in hotspot_zone.channels:
+            if ch_name == disc_ch_name:
+                continue
             ch = next((c for c in codeplug.channels if c.name == ch_name), None)
             if ch:
                 tg_id = _contact_to_tgid.get(ch.tx_contact)
                 cat = _tg_category.get(tg_id, "Wide Area") if tg_id else "Wide Area"
                 hs_cat_channels.setdefault(cat, []).append(ch_name)
-        # Emit zones in category order, splitting at 64
+
+        # Emit zones: cap at 63 content channels per page, disconnect fills slot 64
         for cat in bm_catalog_mod.CATEGORY_ORDER:
             ch_names = hs_cat_channels.get(cat, [])
             if not ch_names:
                 continue
             base = bm_catalog_mod.CATEGORY_ZONE_NAMES.get(cat, f"HS {cat}")[:16]
-            for page_idx, offset in enumerate(range(0, len(ch_names), 64)):
+            for page_idx, offset in enumerate(range(0, len(ch_names), 63)):
+                page = ch_names[offset:offset + 63]
+                if disc_ch_name:
+                    page = page + [disc_ch_name]
                 suffix = "" if page_idx == 0 else str(page_idx + 1)
                 codeplug.zones.append(Zone(
                     name=(base + suffix)[:16],
-                    channels=ch_names[offset:offset + 64],
+                    channels=page,
                 ))
 
     # Inject manually entered hotspot talkgroups into "HS Manual TGs"
@@ -509,11 +524,15 @@ async def generate(req: GenerateRequest):
                 new_channels.append(name)
 
         if new_channels:
-            for page_idx, offset in enumerate(range(0, len(new_channels), 64)):
+            # Manual zone also gets disconnect as last channel
+            for page_idx, offset in enumerate(range(0, len(new_channels), 63)):
+                page = new_channels[offset:offset + 63]
+                if disc_ch_name:
+                    page = page + [disc_ch_name]
                 suffix = "" if page_idx == 0 else str(page_idx + 1)
                 codeplug.zones.append(Zone(
                     name=f"HS Manual TGs{suffix}"[:16],
-                    channels=new_channels[offset:offset + 64],
+                    channels=page,
                 ))
 
     # Inject selected analog repeaters into per-state/band zones
