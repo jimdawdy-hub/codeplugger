@@ -256,4 +256,27 @@ import_data.py         — Repeater database build tool
 
 ---
 
-*© 2026 James Dawdy, KQ9I — not affiliated with Baofeng, BrandMeister, or RadioID.net*
+## License
+
+MIT License — © 2026 James Dawdy, KQ9I. See [LICENSE](LICENSE) for full text.
+
+---
+
+## Credits and Data Sources
+
+CODEPLUGGER would not exist without the work of the amateur radio community:
+
+- **[RepeaterBook](https://www.repeaterbook.com)** — The bundled repeater database (`data/repeaters.db`) was built from RepeaterBook's publicly shared Google Earth KML export. RepeaterBook is a community-maintained repeater directory. Their data is used here for personal, non-commercial amateur radio purposes in the spirit in which it was shared.
+
+- **[RadioID.net](https://radioid.net)** — Live DMR repeater and user data via their free public API. RadioID is the global registry for DMR IDs.
+
+- **[BrandMeister](https://brandmeister.network)** — Live repeater verification and talkgroup catalog via their public API. The bundled `Talkgroups BrandMeister.csv` contains community-maintained talkgroup data from the BrandMeister network.
+
+- **[HearHam](https://hearham.com)** — DMR talkgroup data source for the optional `import_data.py --hearham` import.
+
+**Software dependencies** (all MIT or BSD licensed):
+[FastAPI](https://fastapi.tiangolo.com) · [uvicorn](https://www.uvicorn.org) · [httpx](https://www.python-httpx.org) · [pdfplumber](https://github.com/jsvine/pdfplumber) · [pydantic](https://docs.pydantic.dev)
+
+---
+
+*Not affiliated with Baofeng, BrandMeister, RadioID.net, or RepeaterBook.*
