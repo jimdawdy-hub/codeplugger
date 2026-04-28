@@ -21,8 +21,9 @@ tg list.csv
 .vscode/
 *.swp
 
-# Repeater database (rebuilt by import_data.py)
-data/repeaters.db
+# Repeater database is committed so new installs work out of the box.
+# To rebuild it locally: python import_data.py (requires the KML ZIP from Google Drive)
+# data/repeaters.db
 
 # Source data files (PDFs, KML ZIPs — large, copyrighted)
 *.pdf
