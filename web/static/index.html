@@ -364,7 +364,7 @@
       <h2><span class="step-number">6</span> Options</h2>
       <div class="row">
         <div>
-          <label for="power">TX Power</label>
+          <label for="power">TX Power <span style="font-weight:400;color:var(--muted)">(Repeaters Only)</span></label>
           <select id="power">
             <option value="High" selected>High</option>
             <option value="Medium">Medium</option>
@@ -374,6 +374,7 @@
         <div>
           <label for="hsFreq">Hotspot Frequency (MHz)</label>
           <input type="text" id="hsFreq" value="433.550">
+          <p class="muted" style="margin:0.25rem 0 0;font-size:0.85rem">Hotspot channels are always set to Low power.</p>
         </div>
       </div>
     </div>
