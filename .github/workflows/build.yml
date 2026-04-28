@@ -1,0 +1,108 @@
+name: Build Packages
+
+on:
+  push:
+    tags:
+      - "v*"          # trigger on version tags: v0.1.0, v1.0.0, etc.
+  workflow_dispatch:  # allow manual trigger from GitHub Actions tab
+
+jobs:
+  build:
+    name: Build — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: CODEPLUGGER-windows
+            exe: dist/CODEPLUGGER/CODEPLUGGER.exe
+          - os: macos-latest
+            artifact: CODEPLUGGER-macos
+            exe: dist/CODEPLUGGER/CODEPLUGGER
+          - os: ubuntu-latest
+            artifact: CODEPLUGGER-linux
+            exe: dist/CODEPLUGGER/CODEPLUGGER
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller CODEPLUGGER.spec
+
+      - name: Verify executable exists
+        shell: bash
+        run: |
+          ls -lh "${{ matrix.exe }}"
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Compress-Archive -Path dist/CODEPLUGGER -DestinationPath ${{ matrix.artifact }}.zip
+
+      - name: Package (macOS / Linux)
+        if: matrix.os != 'windows-latest'
+        run: tar -czf ${{ matrix.artifact }}.tar.gz -C dist CODEPLUGGER
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.zip
+            ${{ matrix.artifact }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CODEPLUGGER ${{ github.ref_name }}
+          body: |
+            ## CODEPLUGGER ${{ github.ref_name }}
+
+            ### Download for your platform
+
+            | Platform | File |
+            |---|---|
+            | Windows | `CODEPLUGGER-windows.zip` |
+            | macOS | `CODEPLUGGER-macos.tar.gz` |
+            | Linux | `CODEPLUGGER-linux.tar.gz` |
+
+            ### How to install
+
+            **Windows:** Download the ZIP, extract it anywhere, double-click `CODEPLUGGER.exe`.
+            Your browser will open automatically to the app.
+
+            **macOS / Linux:** Download the tar.gz, extract it, run `./CODEPLUGGER` in a terminal.
+
+            > **Alpha software** — see the Discussions tab before using.
+          draft: false
+          prerelease: true
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz

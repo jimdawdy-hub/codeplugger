@@ -8,7 +8,8 @@ each TG into one of the groups used for the hotspot zone picker.
 import csv
 import pathlib
 
-_CSV_PATH = pathlib.Path(__file__).parent.parent / "Talkgroups BrandMeister.csv"
+from .paths import ROOT
+_CSV_PATH = ROOT / "Talkgroups BrandMeister.csv"
 
 # Category → zone name used in the generated codeplug (≤16 chars)
 CATEGORY_ZONE_NAMES: dict[str, str] = {

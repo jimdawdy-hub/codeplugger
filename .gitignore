@@ -12,6 +12,11 @@ my_codeplug/
 output/
 *.zip
 
+# PyInstaller build output
+build/
+dist/
+*.spec.bak
+
 # Test/scratch files
 Channels_corrupt_export.csv
 tg list.csv

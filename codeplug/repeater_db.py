@@ -13,7 +13,8 @@ import pathlib
 from dataclasses import dataclass
 from typing import Optional
 
-DB_PATH = pathlib.Path(__file__).resolve().parent.parent / "data" / "repeaters.db"
+from .paths import ROOT
+DB_PATH = ROOT / "data" / "repeaters.db"
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# Resolve static dir — works in both dev and PyInstaller frozen builds
+from codeplug.paths import ROOT as _PKG_ROOT
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -56,7 +59,7 @@ def _expand_networks(selected: list[str]) -> list[str]:
     return out
 
 # Serve static files (the single-page UI)
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR = _PKG_ROOT / "web" / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
