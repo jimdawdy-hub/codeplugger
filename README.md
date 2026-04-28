@@ -12,9 +12,34 @@ Available as a **web UI** and a **command-line tool**.
 
 ---
 
-## Install — Windows, Step by Step
+## Install — Download the Package (Easiest)
 
-**For hams who've used a computer for years but never touched Python, GitHub, or a terminal. About 30 minutes the first time.**
+**No Python, no terminal, no setup. Just download and run.**
+
+1. Go to the [**Releases page**](https://github.com/jimdawdy-hub/codeplugger/releases) and download the file for your platform:
+
+   | Platform | File to download |
+   |---|---|
+   | Windows | `CODEPLUGGER-windows.zip` |
+   | macOS | `CODEPLUGGER-macos.tar.gz` |
+   | Linux | `CODEPLUGGER-linux.tar.gz` |
+
+2. Extract the downloaded file anywhere you like (e.g. your Desktop or Documents folder)
+
+3. **Windows:** Open the extracted `CODEPLUGGER` folder and double-click **`CODEPLUGGER.exe`**
+   **macOS / Linux:** Open a terminal in the extracted folder and run `./CODEPLUGGER`
+
+4. A black window will appear briefly while the server starts — your browser will open automatically to the app at `http://localhost:8000`
+
+5. **Leave the black window open while you use the app.** Closing it shuts down the server.
+
+> **Note:** Windows may show a "Windows protected your PC" warning the first time. Click **"More info"** then **"Run anyway"** — this appears because the app isn't code-signed yet.
+
+---
+
+## Install — From Source (Windows, Step by Step)
+
+**If there's no package available for your platform yet, or you prefer to run from source. About 30 minutes the first time.**
 
 ### What you'll need
 
