@@ -145,7 +145,7 @@ def _analog_channel_row(no: int, ch: Channel) -> list:
         ch.power,
         "25KHz",
         "None",
-        "Allow TX",
+        "Always",
         "None",
         3,                              # Squelch
         "Off",                          # APRS Report Type
