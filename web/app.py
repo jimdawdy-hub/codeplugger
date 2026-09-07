@@ -163,6 +163,12 @@ async def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/api/health")
+async def health():
+    """Liveness probe for the container healthcheck."""
+    return {"status": "ok", "repeater_db": repeater_db.DB_PATH.exists()}
+
+
 @app.get("/api/hotspot-talkgroups")
 async def hotspot_talkgroups():
     """Return the BM hotspot talkgroup catalog grouped by category (from CSV)."""
@@ -487,7 +493,7 @@ async def generate(req: GenerateRequest):
                     tx_contact=name,
                     rx_group="None",
                     power="Low",
-                    tx_admit="Always",
+                    tx_admit="Allow TX",
                     dmr_id=req.callsign,
                 ))
                 existing_channel_names.add(name)
@@ -513,7 +519,7 @@ async def generate(req: GenerateRequest):
                         tx_contact=disc_ch_name,
                         rx_group="None",
                         power="Low",
-                        tx_admit="Always",
+                        tx_admit="Allow TX",
                         dmr_id=req.callsign,
                     ))
 

@@ -3,424 +3,881 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
   <title>CODEPLUGGER — DM-32UV Codeplug Generator</title>
   <style>
     :root {
-      --bg: #0a0a0f;
-      --card: #16161d;
-      --text: #e8e8f0;
-      --muted: #d8d8e8;
-      --accent: #ff6b35;
-      --accent-hover: #ff8555;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --border: #2a2a3a;
-      --radius: 8px;
+      --bg:            #0b0d12;
+      --bg-raised:     #12151d;
+      --card:          #161a23;
+      --card-hover:    #1c212c;
+      --text:          #e9ecf3;
+      --text-dim:      #a4adc0;
+      --text-faint:    #6f7a8f;
+      --accent:        #ff6b35;
+      --accent-hover:  #ff8455;
+      --accent-soft:   rgba(255,107,53,0.12);
+      --success:       #34d399;
+      --success-soft:  rgba(52,211,153,0.12);
+      --warning:       #fbbf24;
+      --danger:        #f87171;
+      --danger-soft:   rgba(248,113,113,0.10);
+      --border:        #242a36;
+      --border-strong: #333b4a;
+      --radius:        10px;
+      --radius-sm:     6px;
+      --shadow:        0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+      --focus:         0 0 0 3px rgba(255,107,53,.35);
     }
-    * { box-sizing: border-box; }
-    html { font-size: 120%; }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    a { color: var(--accent); }
-    a:hover { color: var(--accent-hover); }
-    .container { max-width: 960px; margin: 0 auto; padding: 1rem; }
 
-    /* Header */
-    header {
+    /* Numbers line up in tables and summaries */
+    .tnum, .repeater-table td, .summary-value {
+      font-variant-numeric: tabular-nums;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    :focus-visible {
+      outline: none;
+      box-shadow: var(--focus);
+      border-radius: var(--radius-sm);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+
+    /* ---------------------------------------------------------------- Header */
+
+    .site-header {
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--bg-raised), var(--bg));
+      padding: 1.75rem 1rem 1.5rem;
       text-align: center;
-      padding: 1.5rem 1rem 0.5rem;
     }
-    header img {
-      max-width: 320px;
-      width: 90%;
-      height: auto;
-      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+    .site-header img {
+      max-width: 300px; width: 72%; height: auto;
+      filter: drop-shadow(0 4px 16px rgba(0,0,0,.55));
     }
-    header p {
-      margin: 0.5rem 0 0;
-      color: var(--muted);
-      font-size: 1.1rem;
-      letter-spacing: 1px;
+    .site-header .tagline {
+      margin: .6rem 0 0;
+      color: var(--text-dim);
+      font-size: .95rem;
+      letter-spacing: .02em;
+    }
+    .site-header .radio-badge {
+      display: inline-block;
+      margin-top: .7rem;
+      padding: .2rem .7rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
     }
 
-    /* Cards / Steps */
+    /* ------------------------------------------------------------- Step rail */
+
+    .rail-wrap {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(11,13,18,.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    .rail {
+      max-width: 1180px; margin: 0 auto;
+      display: flex; gap: .25rem;
+      padding: .5rem 1rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .rail::-webkit-scrollbar { display: none; }
+    .rail a {
+      flex: 0 0 auto;
+      display: inline-flex; align-items: center; gap: .45rem;
+      padding: .35rem .7rem;
+      border-radius: 999px;
+      font-size: .82rem; font-weight: 500;
+      color: var(--text-dim);
+      white-space: nowrap;
+      transition: background .15s, color .15s;
+    }
+    .rail a:hover { background: var(--card); color: var(--text); text-decoration: none; }
+    .rail .dot {
+      width: 16px; height: 16px; flex: 0 0 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border-strong);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: .6rem; font-weight: 700;
+      color: var(--text-faint);
+      transition: background .18s, border-color .18s, color .18s;
+    }
+    .rail a.done { color: var(--text); }
+    .rail a.done .dot {
+      background: var(--success); border-color: var(--success);
+      color: #06281c;
+    }
+    .rail a.done .dot::after { content: "✓"; }
+    .rail a.done .dot .n { display: none; }
+
+    /* ---------------------------------------------------------------- Layout */
+
+    .layout {
+      max-width: 1180px; margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
+      display: grid;
+      grid-template-columns: minmax(0,1fr) 320px;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: minmax(0,1fr); }
+    }
+
+    /* ----------------------------------------------------------------- Cards */
+
     .step {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      margin: 1rem 0;
-      padding: 1.25rem;
-    }
-    .step h2 {
       margin: 0 0 1rem;
-      font-size: 1.1rem;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+      padding: 1.1rem 1.25rem 1.25rem;
+      box-shadow: var(--shadow);
+      scroll-margin-top: 4rem;
+    }
+    .step > h2 {
+      margin: 0 0 .25rem;
+      font-size: 1.02rem;
+      font-weight: 650;
+      letter-spacing: -.01em;
+      display: flex; align-items: center; gap: .6rem;
     }
     .step-number {
-      background: var(--accent);
-      color: #fff;
-      width: 26px; height: 26px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(255,107,53,.35);
+      width: 24px; height: 24px; flex: 0 0 24px;
       border-radius: 50%;
-      display: inline-flex;
-      align-items: center; justify-content: center;
-      font-size: 0.85rem; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: .78rem; font-weight: 700;
+    }
+    .step.is-done .step-number {
+      background: var(--success-soft);
+      color: var(--success);
+      border-color: rgba(52,211,153,.4);
+    }
+    .step-hint {
+      margin: .1rem 0 .9rem 2.1rem;
+      color: var(--text-dim);
+      font-size: .87rem;
+    }
+    .optional-tag {
+      margin-left: auto;
+      font-size: .68rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--text-faint);
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      padding: .1rem .5rem;
     }
 
-    /* Form elements */
-    label { display: block; font-weight: 500; margin: 0.75rem 0 0.25rem; font-size: 0.9rem; }
+    /* ------------------------------------------------------------ Form parts */
+
+    label {
+      display: block;
+      font-weight: 500;
+      margin: .7rem 0 .3rem;
+      font-size: .84rem;
+      color: var(--text-dim);
+    }
     input[type="text"], input[type="number"], select {
       width: 100%;
-      padding: 0.6rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      font-size: 1rem;
-      background: #0f0f14;
+      padding: .55rem .7rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: .95rem;
+      background: #0e1117;
       color: var(--text);
+      transition: border-color .15s, box-shadow .15s;
     }
-    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-    .row > * { flex: 1; min-width: 140px; }
-    .row .btn-inline { flex: 0 0 auto; align-self: flex-end; }
+    input::placeholder { color: var(--text-faint); }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: var(--focus);
+    }
+    input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
 
-    .checkbox-grid { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; margin-top: 0.5rem; }
-    .checkbox-grid label { display: flex; align-items: center; gap: 0.4rem; font-weight: 400; cursor: pointer; margin: 0; }
-    .checkbox-grid input { width: auto; }
+    .row { display: flex; gap: .75rem; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 150px; }
+    .row .btn-inline { flex: 0 0 auto; align-self: flex-end; min-width: 0; }
+
+    .checkbox-grid { display: flex; flex-wrap: wrap; gap: .5rem .75rem; margin-top: .3rem; }
+    .checkbox-grid label {
+      display: inline-flex; align-items: center; gap: .45rem;
+      font-weight: 500; font-size: .88rem; color: var(--text);
+      cursor: pointer; margin: 0;
+      padding: .4rem .7rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      transition: background .15s, border-color .15s;
+    }
+    .checkbox-grid label:hover { background: var(--card-hover); }
+    .checkbox-grid label:has(input:checked) {
+      background: var(--accent-soft);
+      border-color: rgba(255,107,53,.45);
+    }
 
     button, .btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 0.6rem 1.25rem;
-      border: none; border-radius: var(--radius);
-      background: var(--accent); color: #fff;
-      font-size: 1rem; font-weight: 500; cursor: pointer;
-      transition: background 0.15s;
-    }
-    button:hover, .btn:hover { background: var(--accent-hover); }
-    button:disabled, .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    button.secondary { background: var(--muted); }
-    button.secondary:hover { background: #4b5563; }
-    button.success { background: var(--success); }
-    button.success:hover { background: #15803d; }
-
-    /* Repeater table */
-    .repeater-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }
-    .repeater-table th, .repeater-table td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); }
-    .repeater-table th { background: #1e1e28; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; color: var(--muted); position: sticky; top: 0; }
-    .repeater-table tr:hover { background: #1e1e28; }
-    .repeater-table input[type="checkbox"] { transform: scale(1.2); }
-    .badge { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
-    .badge-bm { background: #164020; color: #86efac; }
-    .badge-warn { background: #3a2a00; color: #fbbf24; }
-    .scroll-box { max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
-
-    /* TG Accordion */
-    .tg-group { border: 1px solid var(--border); border-radius: var(--radius); margin: 0.5rem 0; overflow: hidden; }
-    .tg-group-header {
-      background: #1e1e28;
-      padding: 0.6rem 0.9rem;
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      padding: .55rem 1.05rem;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: var(--accent); color: #1a0a02;
+      font: inherit; font-size: .92rem; font-weight: 600;
       cursor: pointer;
-      display: flex; align-items: center; gap: 0.6rem;
-      font-weight: 600; font-size: 0.95rem;
+      transition: background .15s, opacity .15s;
+    }
+    button:hover:not(:disabled), .btn:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled, .btn:disabled { opacity: .45; cursor: not-allowed; }
+    button.secondary {
+      background: transparent; color: var(--text-dim);
+      border-color: var(--border-strong);
+    }
+    button.secondary:hover:not(:disabled) { background: var(--card-hover); color: var(--text); }
+    button.success { background: var(--success); color: #04231a; }
+    button.success:hover:not(:disabled) { background: #4ade9f; }
+    button.icon { padding: .25rem .5rem; font-size: .85rem; line-height: 1; }
+
+    /* ------------------------------------------------------------ State tags */
+
+    .state-tag {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--bg-raised);
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      padding: .25rem .35rem .25rem .8rem;
+      margin: .3rem .35rem 0 0;
+      font-size: .87rem; font-weight: 500;
+    }
+    #statesList { display: flex; flex-wrap: wrap; }
+    #statesList:empty::after {
+      content: "No states added yet.";
+      color: var(--text-faint); font-size: .85rem; padding-top: .4rem;
+    }
+
+    /* ------------------------------------------------------------- Tab strip */
+
+    .tabs {
+      display: flex; gap: .25rem;
+      border-bottom: 1px solid var(--border);
+      margin: .2rem 0 1rem;
+    }
+    .tabs button {
+      background: none; border: none; border-bottom: 2px solid transparent;
+      border-radius: 0;
+      color: var(--text-dim);
+      padding: .5rem .85rem;
+      font-size: .9rem; font-weight: 600;
+    }
+    .tabs button:hover:not(:disabled) { background: none; color: var(--text); }
+    .tabs button[aria-selected="true"] {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* ---------------------------------------------------------------- Tables */
+
+    .table-toolbar {
+      display: flex; align-items: center; gap: .6rem;
+      flex-wrap: wrap;
+      margin: .75rem 0 .5rem;
+    }
+    .table-toolbar input[type="text"] { flex: 1; min-width: 160px; }
+    .count-pill {
+      font-size: .8rem; font-weight: 600;
+      color: var(--text-dim);
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: .2rem .65rem;
+      white-space: nowrap;
+    }
+
+    .scroll-box {
+      max-height: 420px; overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .repeater-table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+    .repeater-table th, .repeater-table td {
+      padding: .45rem .6rem; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .repeater-table th {
+      background: var(--bg-raised);
+      font-weight: 600; font-size: .72rem;
+      text-transform: uppercase; letter-spacing: .05em;
+      color: var(--text-dim);
+      position: sticky; top: 0; z-index: 1;
+    }
+    .repeater-table tbody tr:hover { background: var(--card-hover); }
+    .repeater-table tbody tr:last-child td { border-bottom: none; }
+    .repeater-table tbody tr.filtered-out { display: none; }
+    .repeater-table td strong { font-weight: 600; }
+
+    .badge {
+      display: inline-block; padding: .1rem .45rem;
+      border-radius: 999px; font-size: .68rem; font-weight: 700;
+      letter-spacing: .03em;
+    }
+    .badge-bm   { background: var(--success-soft); color: var(--success); }
+    .badge-warn { background: rgba(251,191,36,.12); color: var(--warning); }
+
+    .empty-note {
+      padding: 1.25rem; text-align: center;
+      color: var(--text-faint); font-size: .87rem;
+    }
+
+    /* ------------------------------------------------------ Talkgroup groups */
+
+    .tg-group {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin: .45rem 0; overflow: hidden;
+    }
+    .tg-group-header {
+      background: var(--bg-raised);
+      padding: .5rem .8rem;
+      cursor: pointer;
+      display: flex; align-items: center; gap: .55rem;
+      font-weight: 600; font-size: .9rem;
       user-select: none;
     }
-    .tg-group-header:hover { background: #252532; }
-    .tg-group-header .chevron { margin-left: auto; transition: transform 0.2s; }
+    .tg-group-header:hover { background: var(--card-hover); }
+    .tg-group-header .chevron {
+      margin-left: auto; color: var(--text-faint);
+      transition: transform .18s;
+    }
     .tg-group.open .tg-group-header .chevron { transform: rotate(90deg); }
-    .tg-group-body { display: none; padding: 0.75rem; }
+    .tg-group-body { display: none; padding: .6rem .8rem; }
     .tg-group.open .tg-group-body { display: block; }
-    /* Country sub-groups within Countries category */
-    .tg-subgroup { margin: 0.25rem 0; border: 1px solid #2a2a3a; border-radius: 6px; overflow: hidden; }
+
+    .tg-subgroup {
+      margin: .2rem 0; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); overflow: hidden;
+    }
     .tg-subgroup-header {
-      background: #12121a; padding: 0.4rem 0.7rem;
-      display: flex; align-items: center; gap: 0.5rem; cursor: pointer;
-      font-size: 0.9rem; font-weight: 600; user-select: none;
+      background: #0e1117; padding: .35rem .65rem;
+      display: flex; align-items: center; gap: .45rem; cursor: pointer;
+      font-size: .85rem; font-weight: 600; user-select: none;
     }
-    .tg-subgroup-header:hover { background: #1a1a24; }
-    .tg-subgroup-header .chevron { margin-left: auto; transition: transform 0.2s; font-size: 0.8rem; }
+    .tg-subgroup-header:hover { background: var(--card-hover); }
+    .tg-subgroup-header .chevron {
+      margin-left: auto; font-size: .75rem; color: var(--text-faint);
+      transition: transform .18s;
+    }
     .tg-subgroup.open .tg-subgroup-header .chevron { transform: rotate(90deg); }
-    .tg-subgroup-body { display: none; padding: 0.4rem 0.7rem 0.5rem 1.2rem; }
+    .tg-subgroup-body { display: none; padding: .35rem .65rem .45rem 1.1rem; }
     .tg-subgroup.open .tg-subgroup-body { display: block; }
-    .tg-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
-    .tg-item input { margin: 0; }
-    .tg-item span { font-size: 0.88rem; }
-    .tg-item .tg-id { color: var(--muted); font-size: 0.78rem; font-family: monospace; }
-    .tg-search { margin-bottom: 0.75rem; }
 
-    /* Disclaimer */
+    .tg-item {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .18rem .25rem; border-radius: 4px; cursor: pointer;
+    }
+    .tg-item:hover { background: var(--card-hover); }
+    .tg-item span { font-size: .86rem; }
+    .tg-item .tg-id {
+      margin-left: auto;
+      color: var(--text-faint); font-size: .76rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .tg-search { margin-bottom: .7rem; }
+
+    /* ------------------------------------------------------------ Disclaimer */
+
     .disclaimer-box {
-      background: #1a0f0f;
-      border: 1px solid #3a2020;
-      border-radius: var(--radius);
-      padding: 1rem;
-      font-size: 0.9rem;
-      color: #e8c8c8;
-      max-height: 200px;
-      overflow-y: auto;
+      background: #14100f;
+      border: 1px solid #33231d;
+      border-radius: var(--radius-sm);
+      padding: .9rem 1rem;
+      font-size: .85rem;
+      color: #dccac2;
+      max-height: 190px; overflow-y: auto;
     }
-    .disclaimer-box h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-    .disclaimer-box p { margin: 0.35rem 0; }
-    .disclaimer-agree { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
-    .disclaimer-agree input { width: auto; }
+    .disclaimer-box h3 { margin: 0 0 .5rem; font-size: .92rem; color: var(--text); }
+    .disclaimer-box p { margin: .35rem 0; }
+    .disclaimer-agree {
+      display: flex; align-items: center; gap: .55rem;
+      margin-top: .8rem; font-size: .9rem;
+    }
+    .disclaimer-agree label { margin: 0; font-weight: 500; color: var(--text); }
 
-    /* Footer */
-    .ad-space {
+    /* --------------------------------------------------------------- Sidebar */
+
+    .sidebar { position: sticky; top: 3.6rem; }
+    @media (max-width: 900px) { .sidebar { position: static; } }
+
+    .summary-card {
       background: var(--card);
-      border: 2px dashed var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 2rem;
-      text-align: center;
-      color: var(--muted);
-      margin: 2rem 0 1rem;
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
-    .ad-space a { color: var(--accent); }
+    .summary-card h2 {
+      margin: 0; padding: .85rem 1.1rem;
+      font-size: .8rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .07em;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-raised);
+    }
+    .summary-body { padding: .5rem 1.1rem .9rem; }
+    .summary-row {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: .75rem;
+      padding: .4rem 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: .87rem;
+    }
+    .summary-row:last-of-type { border-bottom: none; }
+    .summary-label { color: var(--text-dim); }
+    .summary-value { font-weight: 650; text-align: right; }
+    .summary-value.pending { color: var(--text-faint); font-weight: 500; }
+
+    .estimate {
+      margin-top: .7rem; padding: .6rem .75rem;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: .82rem; color: var(--text-dim);
+      display: flex; justify-content: space-between; gap: .5rem;
+    }
+    .estimate strong { color: var(--text); font-weight: 650; }
+
+    .blockers {
+      margin: .8rem 0 0; padding: .65rem .8rem;
+      background: var(--danger-soft);
+      border: 1px solid rgba(248,113,113,.25);
+      border-radius: var(--radius-sm);
+      font-size: .82rem;
+      color: #f2c3c3;
+    }
+    .blockers strong { display: block; margin-bottom: .3rem; color: var(--danger); }
+    .blockers ul { margin: 0; padding-left: 1.1rem; }
+    .blockers li { margin: .12rem 0; }
+
+    .generate-wrap { padding: 0 1.1rem 1.1rem; }
+    #btnGenerate { width: 100%; font-size: 1rem; padding: .7rem 1rem; }
+
+    .next-steps {
+      margin-top: 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .9rem 1.1rem;
+      font-size: .82rem;
+      color: var(--text-dim);
+      box-shadow: var(--shadow);
+    }
+    .next-steps h3 {
+      margin: 0 0 .5rem; font-size: .75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .07em;
+      color: var(--text-dim);
+    }
+    .next-steps ol { margin: 0; padding-left: 1.15rem; }
+    .next-steps li { margin: .2rem 0; }
+    .next-steps code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .78rem; color: var(--text);
+      background: var(--bg-raised);
+      padding: .05rem .3rem; border-radius: 3px;
+    }
+    .next-steps .warn {
+      margin-top: .6rem; padding-top: .6rem;
+      border-top: 1px solid var(--border);
+      color: var(--warning);
+    }
+
+    /* ------------------------------------------------------------------ Misc */
+
+    .sponsor {
+      max-width: 1180px; margin: 0 auto;
+      padding: 0 1rem 2rem;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: .82rem;
+    }
+    .sponsor a { color: var(--text-dim); }
+
     footer {
       text-align: center;
-      padding: 1.5rem 1rem;
-      color: var(--muted);
-      font-size: 0.85rem;
+      padding: 1.5rem 1rem 2.5rem;
+      color: var(--text-faint);
+      font-size: .8rem;
       border-top: 1px solid var(--border);
     }
+    footer p { margin: .2rem 0; }
 
-    /* Utilities */
     .hidden { display: none !important; }
-    .loading { opacity: 0.6; pointer-events: none; }
-    .error { color: var(--danger); font-size: 0.9rem; margin-top: 0.25rem; }
-    .success-text { color: var(--success); font-size: 0.9rem; margin-top: 0.25rem; }
-    .muted { color: var(--muted); font-size: 0.85rem; }
-    .text-right { text-align: right; }
-    .mt-1 { margin-top: 0.5rem; }
-    .mb-1 { margin-bottom: 0.5rem; }
+    .error {
+      color: var(--danger); font-size: .85rem; margin-top: .5rem;
+      background: var(--danger-soft);
+      border: 1px solid rgba(248,113,113,.25);
+      border-radius: var(--radius-sm);
+      padding: .45rem .65rem;
+    }
+    .muted { color: var(--text-dim); font-size: .85rem; }
+    .mt-1 { margin-top: .5rem; }
+    .mb-1 { margin-bottom: .5rem; }
+
+    .spinner {
+      width: 13px; height: 13px;
+      border: 2px solid rgba(0,0,0,.25);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 600px) {
-      header h1 { font-size: 1.8rem; }
-      .repeater-table th, .repeater-table td { padding: 0.4rem 0.35rem; font-size: 0.8rem; }
+      .layout { padding: 1rem .75rem 2rem; }
+      .step { padding: 1rem; }
+      .step-hint { margin-left: 0; }
+      .repeater-table th, .repeater-table td { padding: .4rem .35rem; font-size: .8rem; }
       .repeater-table .hide-mobile { display: none; }
+      .site-header { padding: 1.25rem 1rem 1rem; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <img src="/static/logo.png" alt="CODEPLUGGER">
-      <p>Automatic code plug generation for the DM-32UV</p>
-    </header>
 
-    <!-- STEP 1: DMR ID -->
-    <div class="step" id="step1">
-      <h2><span class="step-number">1</span> Your DMR ID</h2>
-      <div class="row">
-        <div style="flex:2">
-          <label for="dmrId">DMR ID</label>
-          <input type="number" id="dmrId" placeholder="e.g. 3179879" min="1">
+  <header class="site-header">
+    <img src="/static/logo.png" alt="CODEPLUGGER">
+    <p class="tagline">Build a DMR codeplug from live repeater data — no spreadsheets.</p>
+    <span class="radio-badge">Baofeng DM-32UV</span>
+  </header>
+
+  <nav class="rail-wrap" aria-label="Progress">
+    <div class="rail" id="rail">
+      <a href="#step1" data-step="1"><span class="dot"><span class="n">1</span></span>DMR ID</a>
+      <a href="#step2" data-step="2"><span class="dot"><span class="n">2</span></span>States</a>
+      <a href="#step3" data-step="3"><span class="dot"><span class="n">3</span></span>Networks</a>
+      <a href="#step4" data-step="4"><span class="dot"><span class="n">4</span></span>Repeaters</a>
+      <a href="#step5" data-step="5"><span class="dot"><span class="n">5</span></span>Hotspot</a>
+      <a href="#step6" data-step="6"><span class="dot"><span class="n">6</span></span>Options</a>
+      <a href="#step7" data-step="7"><span class="dot"><span class="n">7</span></span>Terms</a>
+    </div>
+  </nav>
+
+  <div class="layout">
+
+    <main>
+
+      <!-- STEP 1 -->
+      <section class="step" id="step1">
+        <h2><span class="step-number">1</span> Your DMR ID</h2>
+        <p class="step-hint">Looked up on RadioID.net. Your callsign becomes the Radio ID name that every channel references.</p>
+        <div class="row">
+          <div style="flex:2">
+            <label for="dmrId">DMR ID</label>
+            <input type="number" id="dmrId" placeholder="e.g. 3179879" min="1" autocomplete="off">
+          </div>
+          <div class="btn-inline">
+            <button onclick="lookupUser()" id="btnLookup">Look Up</button>
+          </div>
         </div>
-        <div class="btn-inline">
-          <button onclick="lookupUser()" id="btnLookup">Look Up</button>
+        <div id="userInfo" class="hidden mt-1">
+          <div class="summary-row"><span class="summary-label">Callsign</span><span class="summary-value" id="uiCallsign"></span></div>
+          <div class="summary-row"><span class="summary-label">Name</span><span class="summary-value" id="uiName"></span></div>
+          <div class="summary-row"><span class="summary-label">Location</span><span class="summary-value" id="uiLocation"></span></div>
+        </div>
+        <div id="lookupError" class="error hidden"></div>
+      </section>
+
+      <!-- STEP 2 -->
+      <section class="step" id="step2">
+        <h2><span class="step-number">2</span> States to search</h2>
+        <p class="step-hint">Every repeater in each state is returned; you pick the ones you want in step 4.</p>
+        <div class="row mb-1" style="align-items:flex-end;gap:.5rem">
+          <div style="flex:1">
+            <label for="stateSelect">Add a state</label>
+            <select id="stateSelect">
+              <option value="">— choose state —</option>
+              <option>Alabama</option><option>Alaska</option><option>Arizona</option>
+              <option>Arkansas</option><option>California</option><option>Colorado</option>
+              <option>Connecticut</option><option>Delaware</option>
+              <option>District of Columbia</option><option>Florida</option>
+              <option>Georgia</option><option>Hawaii</option><option>Idaho</option>
+              <option>Illinois</option><option>Indiana</option><option>Iowa</option>
+              <option>Kansas</option><option>Kentucky</option><option>Louisiana</option>
+              <option>Maine</option><option>Maryland</option><option>Massachusetts</option>
+              <option>Michigan</option><option>Minnesota</option><option>Mississippi</option>
+              <option>Missouri</option><option>Montana</option><option>Nebraska</option>
+              <option>Nevada</option><option>New Hampshire</option><option>New Jersey</option>
+              <option>New Mexico</option><option>New York</option>
+              <option>North Carolina</option><option>North Dakota</option>
+              <option>Ohio</option><option>Oklahoma</option><option>Oregon</option>
+              <option>Pennsylvania</option><option>Rhode Island</option>
+              <option>South Carolina</option><option>South Dakota</option>
+              <option>Tennessee</option><option>Texas</option><option>Utah</option>
+              <option>Vermont</option><option>Virginia</option><option>Washington</option>
+              <option>West Virginia</option><option>Wisconsin</option><option>Wyoming</option>
+            </select>
+          </div>
+          <div class="btn-inline">
+            <button class="secondary" onclick="addState()">+ Add</button>
+          </div>
+        </div>
+        <div id="statesList"></div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section class="step" id="step3">
+        <h2><span class="step-number">3</span> Networks</h2>
+        <p class="step-hint">Which DMR networks to include. BrandMeister covers most of the US.</p>
+        <div class="checkbox-grid">
+          <label><input type="checkbox" class="net-cb" value="BrandMeister" checked> BrandMeister</label>
+          <label><input type="checkbox" class="net-cb" value="DMR-MARC" checked> DMR-MARC</label>
+          <label><input type="checkbox" class="net-cb" value="Tristate"> Tristate</label>
+          <label><input type="checkbox" class="net-cb" value="ChicagoLand-CC"> ChicagoLand-CC</label>
+        </div>
+      </section>
+
+      <!-- STEP 4 -->
+      <section class="step" id="step4">
+        <h2><span class="step-number">4</span> Repeaters</h2>
+        <p class="step-hint">Search, then untick anything out of range. Each digital repeater becomes its own zone.</p>
+
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tabDigitalBtn" aria-selected="true" aria-controls="paneDigital"
+                  onclick="switchRepeaterTab('digital')">Digital (DMR)</button>
+          <button role="tab" id="tabAnalogBtn" aria-selected="false" aria-controls="paneAnalog"
+                  onclick="switchRepeaterTab('analog')">Analog FM</button>
+        </div>
+
+        <div id="paneDigital" role="tabpanel" aria-labelledby="tabDigitalBtn">
+          <button onclick="searchRepeaters()" id="btnSearch">Search DMR repeaters</button>
+          <div id="repeaterResults" class="hidden">
+            <div class="table-toolbar">
+              <input type="text" id="repFilter" placeholder="Filter by callsign, city or frequency…"
+                     oninput="filterTable('repeaterTbody', this.value)" aria-label="Filter DMR repeaters">
+              <span class="count-pill" id="repCount">0 selected</span>
+            </div>
+            <div class="scroll-box">
+              <table class="repeater-table">
+                <thead>
+                  <tr>
+                    <th><input type="checkbox" id="selectAll" onchange="toggleAllRepeaters()" aria-label="Select all DMR repeaters"></th>
+                    <th>Callsign</th>
+                    <th>City</th>
+                    <th class="hide-mobile">State</th>
+                    <th class="hide-mobile">Freq</th>
+                    <th>CC</th>
+                    <th>Network</th>
+                    <th>BM</th>
+                    <th class="hide-mobile">Timeslots</th>
+                  </tr>
+                </thead>
+                <tbody id="repeaterTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="searchError" class="error hidden"></div>
+        </div>
+
+        <div id="paneAnalog" role="tabpanel" aria-labelledby="tabAnalogBtn" class="hidden">
+          <p class="muted mb-1">FM repeaters from the bundled database, grouped into zones by state and band
+            (e.g. <em>NC 2m Analog</em>). CTCSS is encode-only, per normal ham practice.</p>
+          <button onclick="searchAnalog()" id="btnAnalog">Search analog repeaters</button>
+          <div id="analogResults" class="hidden">
+            <div class="table-toolbar">
+              <input type="text" id="analogFilter" placeholder="Filter by name, callsign or frequency…"
+                     oninput="filterTable('analogTbody', this.value)" aria-label="Filter analog repeaters">
+              <span class="count-pill" id="analogCount">0 selected</span>
+            </div>
+            <div class="scroll-box">
+              <table class="repeater-table">
+                <thead>
+                  <tr>
+                    <th><input type="checkbox" id="selectAllAnalog" onchange="toggleAllAnalog()" aria-label="Select all analog repeaters"></th>
+                    <th>Name</th>
+                    <th class="hide-mobile">Callsign</th>
+                    <th>RX Freq</th>
+                    <th class="hide-mobile">TX Freq</th>
+                    <th>CTCSS</th>
+                    <th class="hide-mobile">County</th>
+                  </tr>
+                </thead>
+                <tbody id="analogTbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="analogError" class="error hidden"></div>
+        </div>
+      </section>
+
+      <!-- STEP 5 -->
+      <section class="step" id="step5">
+        <h2><span class="step-number">5</span> Hotspot talkgroups <span class="optional-tag">Optional</span></h2>
+        <p class="step-hint">Talkgroups for your hotspot zone. Skip this if you don't run a hotspot.</p>
+        <input type="text" class="tg-search" id="tgSearch" placeholder="Search talkgroups…"
+               oninput="filterTGs()" aria-label="Search talkgroups">
+        <div id="tgContainer"></div>
+        <div id="tgError" class="error hidden"></div>
+
+        <details style="margin-top:1rem">
+          <summary style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text-dim)">
+            Add a talkgroup that isn't listed
+          </summary>
+          <p class="muted mt-1" style="margin-bottom:.5rem">
+            Name is what shows on the radio LCD — 12 characters max.
+          </p>
+          <div id="manualTgList"></div>
+          <button class="secondary mt-1" onclick="addManualTg()">+ Add talkgroup</button>
+        </details>
+      </section>
+
+      <!-- STEP 6 -->
+      <section class="step" id="step6">
+        <h2><span class="step-number">6</span> Options</h2>
+        <div class="row">
+          <div>
+            <label for="power">TX power <span style="font-weight:400;color:var(--text-faint)">(repeaters only)</span></label>
+            <select id="power">
+              <option value="High" selected>High</option>
+              <option value="Middle">Middle</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div>
+            <label for="hsFreq">Hotspot frequency (MHz)</label>
+            <input type="text" id="hsFreq" value="433.550" inputmode="decimal">
+            <p class="muted" style="margin:.3rem 0 0;font-size:.8rem">Hotspot channels are always Low power.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP 7 -->
+      <section class="step" id="step7">
+        <h2><span class="step-number">7</span> Terms of use</h2>
+        <div class="disclaimer-box">
+          <h3>Please read before generating</h3>
+          <p>By generating and downloading a codeplug from CODEPLUGGER, you acknowledge and agree to the following:</p>
+          <p><strong>Use at your own risk.</strong> This software generates codeplug files based on publicly available repeater data. The generated files are provided "as is" without warranty of any kind.</p>
+          <p><strong>Review required.</strong> You are solely responsible for carefully reviewing the generated codeplug before importing it into your radio. Verify frequencies, offsets, color codes, talkgroups, and all other parameters.</p>
+          <p><strong>No liability.</strong> You release James Dawdy (KQ9I), the website host, and any related entity from any and all liability, claims, damages, or losses arising from or related to the use of this software, the generated codeplug files, or any damage to your radio or other equipment.</p>
+          <p><strong>Compliance.</strong> You are responsible for ensuring your radio programming complies with all applicable laws, regulations, and license conditions in your jurisdiction.</p>
+        </div>
+        <div class="disclaimer-agree">
+          <input type="checkbox" id="agreeBox">
+          <label for="agreeBox">I have read and agree to the terms above.</label>
+        </div>
+        <div class="row mt-1">
+          <div style="flex:0 0 200px">
+            <label for="initials">Your initials</label>
+            <input type="text" id="initials" placeholder="e.g. JD" maxlength="4" autocomplete="off">
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="summary-card">
+        <h2>Your codeplug</h2>
+        <div class="summary-body">
+          <div class="summary-row">
+            <span class="summary-label">Callsign</span>
+            <span class="summary-value pending" id="sumCallsign">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">States</span>
+            <span class="summary-value pending" id="sumStates">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">DMR repeaters</span>
+            <span class="summary-value pending" id="sumRepeaters">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Analog repeaters</span>
+            <span class="summary-value pending" id="sumAnalog">—</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Hotspot talkgroups</span>
+            <span class="summary-value pending" id="sumHotspot">—</span>
+          </div>
+
+          <div class="estimate">
+            <span>Estimated size</span>
+            <span><strong id="sumChannels">0</strong> ch · <strong id="sumZones">0</strong> zones</span>
+          </div>
+
+          <div class="blockers hidden" id="blockers">
+            <strong>Before you can generate</strong>
+            <ul id="blockerList"></ul>
+          </div>
+        </div>
+        <div class="generate-wrap">
+          <button class="success" onclick="generateCodeplug()" id="btnGenerate" disabled>
+            Generate &amp; download
+          </button>
+          <div id="genError" class="error hidden"></div>
         </div>
       </div>
-      <div id="userInfo" class="hidden mt-1">
-        <p><strong>Callsign:</strong> <span id="uiCallsign"></span></p>
-        <p><strong>Name:</strong> <span id="uiName"></span></p>
-        <p><strong>Location:</strong> <span id="uiLocation"></span></p>
+
+      <div class="next-steps">
+        <h3>After downloading</h3>
+        <p style="margin:0 0 .5rem">Unzip, then import into the DM-32UV CPS in this order:</p>
+        <ol>
+          <li><code>dmr_id.csv</code></li>
+          <li><code>talk_groups.csv</code></li>
+          <li><code>channels.csv</code></li>
+          <li><code>zones.csv</code></li>
+        </ol>
+        <p class="warn">Import <code>dmr_id.csv</code> first. Skip it and every channel
+          shows as <em>Null Ch.</em> — the full explanation is in the README inside the ZIP.</p>
       </div>
-      <div id="lookupError" class="error hidden"></div>
-    </div>
+    </aside>
 
-    <!-- STEP 2: States -->
-    <div class="step" id="step2">
-      <h2><span class="step-number">2</span> States</h2>
-      <p class="muted">Select one or more states to search. All repeaters in each state will be returned — you choose which ones to include.</p>
-      <div class="row mb-1" style="align-items:flex-end;gap:0.5rem">
-        <div style="flex:1">
-          <label for="stateSelect">Add a State</label>
-          <select id="stateSelect">
-            <option value="">— choose state —</option>
-            <option>Alabama</option><option>Alaska</option><option>Arizona</option>
-            <option>Arkansas</option><option>California</option><option>Colorado</option>
-            <option>Connecticut</option><option>Delaware</option>
-            <option>District of Columbia</option><option>Florida</option>
-            <option>Georgia</option><option>Hawaii</option><option>Idaho</option>
-            <option>Illinois</option><option>Indiana</option><option>Iowa</option>
-            <option>Kansas</option><option>Kentucky</option><option>Louisiana</option>
-            <option>Maine</option><option>Maryland</option><option>Massachusetts</option>
-            <option>Michigan</option><option>Minnesota</option><option>Mississippi</option>
-            <option>Missouri</option><option>Montana</option><option>Nebraska</option>
-            <option>Nevada</option><option>New Hampshire</option><option>New Jersey</option>
-            <option>New Mexico</option><option>New York</option>
-            <option>North Carolina</option><option>North Dakota</option>
-            <option>Ohio</option><option>Oklahoma</option><option>Oregon</option>
-            <option>Pennsylvania</option><option>Rhode Island</option>
-            <option>South Carolina</option><option>South Dakota</option>
-            <option>Tennessee</option><option>Texas</option><option>Utah</option>
-            <option>Vermont</option><option>Virginia</option><option>Washington</option>
-            <option>West Virginia</option><option>Wisconsin</option><option>Wyoming</option>
-          </select>
-        </div>
-        <div class="btn-inline">
-          <button class="secondary" onclick="addState()">+ Add State</button>
-        </div>
-      </div>
-      <div id="statesList"></div>
-    </div>
-
-    <!-- STEP 3: Networks -->
-    <div class="step" id="step3">
-      <h2><span class="step-number">3</span> Networks</h2>
-      <div class="checkbox-grid">
-        <label><input type="checkbox" class="net-cb" value="BrandMeister" checked> BrandMeister</label>
-        <label><input type="checkbox" class="net-cb" value="DMR-MARC" checked> DMR-MARC</label>
-        <label><input type="checkbox" class="net-cb" value="Tristate"> Tristate</label>
-        <label><input type="checkbox" class="net-cb" value="ChicagoLand-CC"> ChicagoLand-CC</label>
-      </div>
-    </div>
-
-    <!-- STEP 4: Search Repeaters -->
-    <div class="step" id="step4">
-      <h2><span class="step-number">4</span> Find Repeaters</h2>
-      <button onclick="searchRepeaters()" id="btnSearch">Search Repeaters</button>
-      <div id="repeaterResults" class="hidden mt-1">
-        <p class="muted mb-1">Select the repeaters you want in your codeplug. ✓BM = verified on BrandMeister.</p>
-        <div class="scroll-box">
-          <table class="repeater-table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="selectAll" onchange="toggleAllRepeaters()"></th>
-                <th>Callsign</th>
-                <th>City</th>
-                <th class="hide-mobile">State</th>
-                <th class="hide-mobile">Freq</th>
-                <th>CC</th>
-                <th>Network</th>
-                <th>BM</th>
-                <th class="hide-mobile">Talkgroups</th>
-              </tr>
-            </thead>
-            <tbody id="repeaterTbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div id="searchError" class="error hidden"></div>
-    </div>
-
-    <!-- STEP 4b: Analog Repeaters -->
-    <div class="step" id="step4b">
-      <h2><span class="step-number">4b</span> Analog Repeaters</h2>
-      <p class="muted">FM repeaters for your locations. Grouped into zones by state and band (e.g. "IL 2m Analog", "IL 70cm Analog"). CTCSS encode-only (standard ham practice).</p>
-      <button onclick="searchAnalog()" id="btnAnalog">Search Analog Repeaters</button>
-      <div id="analogResults" class="hidden mt-1">
-        <p class="muted mb-1">Select the analog repeaters to include.</p>
-        <div class="scroll-box">
-          <table class="repeater-table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="selectAllAnalog" onchange="toggleAllAnalog()"></th>
-                <th>Name</th>
-                <th class="hide-mobile">Callsign</th>
-                <th>RX Freq</th>
-                <th class="hide-mobile">TX Freq</th>
-                <th>CTCSS</th>
-                <th class="hide-mobile">County</th>
-              </tr>
-            </thead>
-            <tbody id="analogTbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div id="analogError" class="error hidden"></div>
-      <p class="muted mt-1" style="font-size:0.8rem">Coverage from the bundled repeater database (RepeaterBook KML data + regional directory PDFs) for the selected states.</p>
-    </div>
-
-    <!-- STEP 5: Hotspot Talkgroups -->
-    <div class="step" id="step5">
-      <h2><span class="step-number">5</span> Hotspot Talkgroups</h2>
-      <p class="muted">Select talkgroups for your hotspot zone (simplex 433.550 MHz).</p>
-      <input type="text" class="tg-search" id="tgSearch" placeholder="Search talkgroups..." oninput="filterTGs()">
-      <div id="tgContainer"></div>
-      <div id="tgError" class="error hidden"></div>
-    </div>
-
-    <!-- STEP 5b: Manual Hotspot Talkgroups -->
-    <div class="step" id="step5b">
-      <h2><span class="step-number">5b</span> Manual BrandMeister Talkgroup Entry</h2>
-      <p class="muted">Add talkgroups not in the catalog above. Name is what appears on the radio LCD (12 chars max).</p>
-      <div class="row" style="margin-bottom:0.25rem">
-        <div style="flex:2"><span class="muted" style="font-size:0.8rem">Display Name (12 chars max)</span></div>
-        <div style="flex:1"><span class="muted" style="font-size:0.8rem">TG Number</span></div>
-        <div style="width:40px"></div>
-      </div>
-      <div id="manualTgList"></div>
-      <button class="secondary mt-1" onclick="addManualTg()">+ Add Talkgroup</button>
-    </div>
-
-    <!-- STEP 6: Options -->
-    <div class="step" id="step6">
-      <h2><span class="step-number">6</span> Options</h2>
-      <div class="row">
-        <div>
-          <label for="power">TX Power <span style="font-weight:400;color:var(--muted)">(Repeaters Only)</span></label>
-          <select id="power">
-            <option value="High" selected>High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-        </div>
-        <div>
-          <label for="hsFreq">Hotspot Frequency (MHz)</label>
-          <input type="text" id="hsFreq" value="433.550">
-          <p class="muted" style="margin:0.25rem 0 0;font-size:0.85rem">Hotspot channels are always set to Low power.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- STEP 7: Disclaimer -->
-    <div class="step" id="step7">
-      <h2><span class="step-number">7</span> Legal Disclaimer</h2>
-      <div class="disclaimer-box">
-        <h3>Terms of Use</h3>
-        <p>By generating and downloading a codeplug from CODEPLUGGER, you acknowledge and agree to the following:</p>
-        <p><strong>Use at your own risk.</strong> This software generates codeplug files based on publicly available repeater data. The generated files are provided "as is" without warranty of any kind.</p>
-        <p><strong>Review required.</strong> You are solely responsible for carefully reviewing the generated codeplug before importing it into your radio. Verify frequencies, offsets, color codes, talkgroups, and all other parameters.</p>
-        <p><strong>No liability.</strong> You release James Dawdy (KQ9I), the website host, and any related entity from any and all liability, claims, damages, or losses arising from or related to the use of this software, the generated codeplug files, or any damage to your radio or other equipment.</p>
-        <p><strong>Compliance.</strong> You are responsible for ensuring your radio programming complies with all applicable laws, regulations, and license conditions in your jurisdiction.</p>
-      </div>
-      <div class="disclaimer-agree">
-        <input type="checkbox" id="agreeBox">
-        <label for="agreeBox" style="margin:0;font-weight:400">I have read and agree to the terms above.</label>
-      </div>
-      <div class="row mt-1">
-        <div style="flex:0 0 200px">
-          <label for="initials">Your Initials</label>
-          <input type="text" id="initials" placeholder="e.g. JD" maxlength="4">
-        </div>
-      </div>
-    </div>
-
-    <!-- STEP 8: Generate -->
-    <div class="step" id="step8" style="text-align:center">
-      <button class="success" onclick="generateCodeplug()" id="btnGenerate" style="font-size:1.2rem;padding:0.8rem 2rem">
-        📻 Generate & Download Codeplug
-      </button>
-      <div id="genError" class="error hidden mt-1"></div>
-    </div>
-
-    <!-- Ad Space -->
-    <div class="ad-space">
-      <p>📢 <strong>Advertise Here</strong></p>
-      <p>Reach DMR operators, ham radio enthusiasts, and codeplug users.<br>Contact <a href="mailto:ads@codeplugger.radio">ads@codeplugger.radio</a> for rates.</p>
-    </div>
-
-    <footer>
-      <p>© 2026 James Dawdy, KQ9I. All rights reserved.</p>
-      <p class="muted">CODEPLUGGER is not affiliated with Baofeng, BrandMeister, or RadioID.net.</p>
-    </footer>
   </div>
+
+  <p class="sponsor">
+    Interested in sponsoring CODEPLUGGER? <a href="mailto:ads@codeplugger.radio">Get in touch</a>.
+  </p>
+
+  <footer>
+    <p>© 2026 James Dawdy, KQ9I. All rights reserved.</p>
+    <p>CODEPLUGGER is not affiliated with Baofeng, BrandMeister, or RadioID.net.</p>
+  </footer>
 
   <script>
     // -------------------------------------------------------------------------
@@ -428,7 +885,9 @@
     // -------------------------------------------------------------------------
     let userCallsign = '';
     let repeaterData = [];
+    let analogData = [];
     let tgData = {};
+    let tgCategoryOrder = [];
 
     // -------------------------------------------------------------------------
     // Helpers
@@ -447,15 +906,23 @@
       return fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts })
         .then(r => { if (!r.ok) return r.json().then(j => Promise.reject(j.detail || r.statusText)); return r.json(); });
     }
+    function busy(btn, label) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>' + escapeHtml(label);
+    }
+    function idle(btn, label) {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
 
     // -------------------------------------------------------------------------
-    // Step 1: DMR Lookup
+    // Step 1: DMR lookup
     // -------------------------------------------------------------------------
     async function lookupUser() {
       const id = parseInt(qs('#dmrId').value, 10);
       if (!id || id < 1000) { setError('lookupError', 'Enter a valid DMR ID'); return; }
       clearError('lookupError');
-      qs('#btnLookup').disabled = true;
+      busy(qs('#btnLookup'), 'Looking up…');
       try {
         const data = await api('/api/lookup-user', { method: 'POST', body: JSON.stringify({ dmr_id: id }) });
         userCallsign = data.callsign;
@@ -463,10 +930,13 @@
         qs('#uiName').textContent = data.name;
         qs('#uiLocation').textContent = data.city + ', ' + data.state;
         show(qs('#userInfo'));
+        // Seed the state list with the operator's own state when it is empty.
+        if (data.state && !getSelectedStates().length) addState(data.state);
       } catch (e) {
         setError('lookupError', e || 'Lookup failed');
       } finally {
-        qs('#btnLookup').disabled = false;
+        idle(qs('#btnLookup'), 'Look Up');
+        updateSummary();
       }
     }
 
@@ -476,33 +946,48 @@
     function addState(stateName) {
       const name = stateName || qs('#stateSelect').value;
       if (!name) return;
-      // Prevent duplicates
       const existing = Array.from(qsa('.state-tag')).map(t => t.dataset.state);
       if (existing.includes(name)) return;
 
       const div = document.createElement('div');
-      div.className = 'row state-tag';
+      div.className = 'state-tag';
       div.dataset.state = name;
-      div.style.cssText = 'align-items:center;gap:0.5rem;padding:0.3rem 0;';
-      div.innerHTML = `<span style="flex:1;font-weight:500">${escapeHtml(name)}</span>
-        <button class="secondary" style="padding:0.2rem 0.6rem" onclick="removeState(this)">✕</button>`;
+      div.innerHTML = `<span>${escapeHtml(name)}</span>
+        <button class="secondary icon" onclick="removeState(this)"
+                aria-label="Remove ${escapeHtml(name)}">✕</button>`;
       qs('#statesList').appendChild(div);
       qs('#stateSelect').value = '';
+      updateSummary();
     }
     function removeState(btn) {
-      const tags = qsa('.state-tag');
-      if (tags.length <= 1) return; // keep at least one
       btn.closest('.state-tag').remove();
+      updateSummary();
     }
     function getSelectedStates() {
       return Array.from(qsa('.state-tag')).map(t => t.dataset.state);
     }
-    // Pre-populate with Illinois and Indiana
-    addState('Illinois');
-    addState('Indiana');
 
     // -------------------------------------------------------------------------
-    // Step 4: Search Repeaters
+    // Step 4: Tabs and filtering
+    // -------------------------------------------------------------------------
+    function switchRepeaterTab(which) {
+      const digital = which === 'digital';
+      qs('#tabDigitalBtn').setAttribute('aria-selected', String(digital));
+      qs('#tabAnalogBtn').setAttribute('aria-selected', String(!digital));
+      qs('#paneDigital').classList.toggle('hidden', !digital);
+      qs('#paneAnalog').classList.toggle('hidden', digital);
+    }
+
+    /** Client-side row filter shared by both repeater tables. */
+    function filterTable(tbodyId, term) {
+      const flt = term.trim().toLowerCase();
+      qsa('#' + tbodyId + ' tr').forEach(tr => {
+        tr.classList.toggle('filtered-out', !!flt && !tr.textContent.toLowerCase().includes(flt));
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 4: DMR repeaters
     // -------------------------------------------------------------------------
     async function searchRepeaters() {
       clearError('searchError');
@@ -513,8 +998,7 @@
       const networks = Array.from(qsa('.net-cb:checked')).map(cb => cb.value);
       if (!networks.length) { setError('searchError', 'Select at least one network'); return; }
 
-      qs('#btnSearch').disabled = true;
-      qs('#btnSearch').textContent = 'Searching...';
+      busy(qs('#btnSearch'), 'Searching…');
       try {
         const data = await api('/api/search-repeaters', {
           method: 'POST',
@@ -526,25 +1010,30 @@
       } catch (e) {
         setError('searchError', e || 'Search failed');
       } finally {
-        qs('#btnSearch').disabled = false;
-        qs('#btnSearch').textContent = 'Search Repeaters';
+        idle(qs('#btnSearch'), 'Search DMR repeaters');
+        updateSummary();
       }
     }
 
     function renderRepeaters() {
       const tbody = qs('#repeaterTbody');
       tbody.innerHTML = '';
+      if (!repeaterData.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-note">No repeaters found for those states and networks.</td></tr>';
+        return;
+      }
       repeaterData.forEach((r, idx) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td><input type="checkbox" class="rep-cb" data-idx="${idx}" checked></td>
+          <td><input type="checkbox" class="rep-cb" data-idx="${idx}" checked
+                     aria-label="Include ${escapeHtml(r.callsign)}"></td>
           <td><strong>${escapeHtml(r.callsign)}</strong></td>
           <td>${escapeHtml(r.city)}</td>
           <td class="hide-mobile">${escapeHtml(r.state)}</td>
-          <td class="hide-mobile">${r.rx_freq.toFixed(5)}</td>
+          <td class="hide-mobile">${r.rx_freq.toFixed(4)}</td>
           <td>${r.color_code}</td>
           <td>${escapeHtml(r.network)}</td>
-          <td>${r.bm_verified ? '<span class="badge badge-bm">✓BM</span>' : '<span class="badge badge-warn">—</span>'}</td>
+          <td>${r.bm_verified ? '<span class="badge badge-bm">✓ BM</span>' : '<span class="badge badge-warn">—</span>'}</td>
           <td class="hide-mobile"><span class="muted">${escapeHtml(r.timeslot_summary)}</span></td>
         `;
         tbody.appendChild(tr);
@@ -554,14 +1043,79 @@
 
     function toggleAllRepeaters() {
       const checked = qs('#selectAll').checked;
-      qsa('.rep-cb').forEach(cb => cb.checked = checked);
+      // Only touch rows the current filter leaves visible.
+      qsa('#repeaterTbody tr:not(.filtered-out) .rep-cb').forEach(cb => cb.checked = checked);
+      updateSummary();
     }
 
     // -------------------------------------------------------------------------
-    // Step 5: Hotspot Talkgroups
+    // Step 4: Analog repeaters
     // -------------------------------------------------------------------------
-    let tgCategoryOrder = [];
+    async function searchAnalog() {
+      clearError('analogError');
+      const states = getSelectedStates();
+      if (!states.length) { setError('analogError', 'Add at least one state first'); return; }
+      const locations = states.map(s => ({ city: '', state: s }));
 
+      busy(qs('#btnAnalog'), 'Searching…');
+      try {
+        const data = await api('/api/search-analog', {
+          method: 'POST',
+          body: JSON.stringify({ locations })
+        });
+        analogData = data.repeaters || [];
+        renderAnalog();
+        show(qs('#analogResults'));
+      } catch (e) {
+        setError('analogError', e || 'Search failed');
+      } finally {
+        idle(qs('#btnAnalog'), 'Search analog repeaters');
+        updateSummary();
+      }
+    }
+
+    function renderAnalog() {
+      const tbody = qs('#analogTbody');
+      tbody.innerHTML = '';
+      if (!analogData.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-note">No analog repeaters in the bundled database for those states.</td></tr>';
+        return;
+      }
+      analogData.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="analog-cb" data-idx="${idx}" checked
+                     aria-label="Include ${escapeHtml(r.name)}"></td>
+          <td><strong>${escapeHtml(r.name)}</strong></td>
+          <td class="hide-mobile">${escapeHtml(r.callsign)}</td>
+          <td>${r.rx_freq.toFixed(4)}</td>
+          <td class="hide-mobile">${r.tx_freq.toFixed(4)}</td>
+          <td>${r.ctcss_encode === 'None' ? '<span class="muted">CSQ</span>' : escapeHtml(r.ctcss_encode)}</td>
+          <td class="hide-mobile"><span class="muted">${escapeHtml(r.county_name)}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      qs('#selectAllAnalog').checked = true;
+    }
+
+    function toggleAllAnalog() {
+      const checked = qs('#selectAllAnalog').checked;
+      qsa('#analogTbody tr:not(.filtered-out) .analog-cb').forEach(cb => cb.checked = checked);
+      updateSummary();
+    }
+
+    function getSelectedAnalog() {
+      return Array.from(qsa('.analog-cb:checked')).map(cb => {
+        const r = analogData[parseInt(cb.dataset.idx)];
+        return { name: r.name, callsign: r.callsign, rx_freq: r.rx_freq,
+                 tx_freq: r.tx_freq, ctcss_encode: r.ctcss_encode,
+                 state: r.state || '' };
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 5: Hotspot talkgroups
+    // -------------------------------------------------------------------------
     async function loadTalkgroups() {
       try {
         const data = await api('/api/hotspot-talkgroups');
@@ -589,26 +1143,22 @@
         div.className = 'tg-group';
         div.dataset.group = groupName;
 
-        // Select-all checkbox for the whole group
         const saId = `sa-${groupName.replace(/\s+/g,'_')}`;
 
         let bodyHtml;
         if (groupName === 'Countries' && !flt) {
-          // Sub-group by country code
           const byCountry = {};
           items.forEach(t => {
             const c = t.country || 'XX';
             (byCountry[c] = byCountry[c] || []).push(t);
           });
-          const sortedCountries = Object.keys(byCountry).sort();
-          bodyHtml = sortedCountries.map(cc => {
+          bodyHtml = Object.keys(byCountry).sort().map(cc => {
             const ctgs = byCountry[cc];
-            const ccId = `cc-${cc}`;
-            const countryName = ctgs[0].name.split(' ')[0]; // rough label
             return `<div class="tg-subgroup" id="sg-${cc}">
               <div class="tg-subgroup-header" onclick="toggleSubGroup('${cc}')">
                 <input type="checkbox" class="tg-country-all" data-country="${cc}"
-                       onclick="event.stopPropagation(); toggleCountryAll(this)">
+                       onclick="event.stopPropagation(); toggleCountryAll(this)"
+                       aria-label="Select all ${escapeHtml(cc)} talkgroups">
                 <span>${escapeHtml(cc)} — ${escapeHtml(ctgs[0].name)} (${ctgs.length})</span>
                 <span class="chevron">▸</span>
               </div>
@@ -617,7 +1167,7 @@
                   <input type="checkbox" class="tg-cb" data-group="${escapeHtml(groupName)}"
                          data-country="${cc}" value="${t.id}" data-name="${escapeHtml(t.name)}">
                   <span>${escapeHtml(t.name)}</span>
-                  <span class="tg-id">(${t.id})</span>
+                  <span class="tg-id">${t.id}</span>
                 </label>`).join('')}
               </div>
             </div>`;
@@ -627,20 +1177,17 @@
             <input type="checkbox" class="tg-cb" data-group="${escapeHtml(groupName)}"
                    value="${t.id}" data-name="${escapeHtml(t.name)}">
             <span>${escapeHtml(t.name)}</span>
-            <span class="tg-id">(${t.id})</span>
+            <span class="tg-id">${t.id}</span>
           </label>`).join('');
         }
 
         div.innerHTML = `
           <div class="tg-group-header" onclick="toggleTGGroup(this.parentElement)">
             <input type="checkbox" id="${saId}" class="tg-group-all" data-group="${escapeHtml(groupName)}"
-                   onclick="event.stopPropagation(); toggleGroupAll(this)">
-            <label for="${saId}" style="margin:0;font-weight:600;cursor:pointer"
-                   onclick="event.stopPropagation()">
-              Select All
-            </label>
-            <span style="margin-left:0.5rem">${escapeHtml(groupName)}
-              <span style="font-weight:400;color:var(--muted)">(${items.length})</span>
+                   onclick="event.stopPropagation(); toggleGroupAll(this)"
+                   aria-label="Select all ${escapeHtml(groupName)} talkgroups">
+            <span>${escapeHtml(groupName)}
+              <span style="font-weight:400;color:var(--text-faint)">(${items.length})</span>
             </span>
             <span class="chevron">▸</span>
           </div>
@@ -650,9 +1197,7 @@
       });
     }
 
-    function toggleTGGroup(groupEl) {
-      groupEl.classList.toggle('open');
-    }
+    function toggleTGGroup(groupEl) { groupEl.classList.toggle('open'); }
 
     function toggleSubGroup(cc) {
       const sg = document.getElementById(`sg-${cc}`);
@@ -663,94 +1208,31 @@
       const group = cb.dataset.group;
       const checked = cb.checked;
       qsa(`.tg-cb[data-group="${group}"]`).forEach(c => c.checked = checked);
-      // Also update any country-level Select All boxes
       qsa(`.tg-country-all`).forEach(c => c.checked = checked);
+      updateSummary();
     }
 
     function toggleCountryAll(cb) {
-      const cc = cb.dataset.country;
       const checked = cb.checked;
-      qsa(`.tg-cb[data-country="${cc}"]`).forEach(c => c.checked = checked);
+      qsa(`.tg-cb[data-country="${cb.dataset.country}"]`).forEach(c => c.checked = checked);
+      updateSummary();
     }
 
-    function filterTGs() {
-      renderTalkgroups(qs('#tgSearch').value);
-    }
+    function filterTGs() { renderTalkgroups(qs('#tgSearch').value); }
 
     // -------------------------------------------------------------------------
-    // Step 4b: Analog repeaters
-    // -------------------------------------------------------------------------
-    let analogData = [];
-
-    async function searchAnalog() {
-      clearError('analogError');
-      const states = getSelectedStates();
-      if (!states.length) { setError('analogError', 'Add at least one state first'); return; }
-      const locations = states.map(s => ({ city: '', state: s }));
-
-      qs('#btnAnalog').disabled = true;
-      qs('#btnAnalog').textContent = 'Searching...';
-      try {
-        const data = await api('/api/search-analog', {
-          method: 'POST',
-          body: JSON.stringify({ locations })
-        });
-        analogData = data.repeaters || [];
-        renderAnalog();
-        show(qs('#analogResults'));
-      } catch (e) {
-        setError('analogError', e || 'Search failed');
-      } finally {
-        qs('#btnAnalog').disabled = false;
-        qs('#btnAnalog').textContent = 'Search Analog Repeaters';
-      }
-    }
-
-    function renderAnalog() {
-      const tbody = qs('#analogTbody');
-      tbody.innerHTML = '';
-      analogData.forEach((r, idx) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><input type="checkbox" class="analog-cb" data-idx="${idx}" checked></td>
-          <td><strong>${escapeHtml(r.name)}</strong></td>
-          <td class="hide-mobile">${escapeHtml(r.callsign)}</td>
-          <td>${r.rx_freq.toFixed(5)}</td>
-          <td class="hide-mobile">${r.tx_freq.toFixed(5)}</td>
-          <td>${r.ctcss_encode === 'None' ? '<span class="muted">CSQ</span>' : r.ctcss_encode}</td>
-          <td class="hide-mobile"><span class="muted">${escapeHtml(r.county_name)}</span></td>
-        `;
-        tbody.appendChild(tr);
-      });
-      qs('#selectAllAnalog').checked = true;
-    }
-
-    function toggleAllAnalog() {
-      const checked = qs('#selectAllAnalog').checked;
-      qsa('.analog-cb').forEach(cb => cb.checked = checked);
-    }
-
-    function getSelectedAnalog() {
-      return Array.from(qsa('.analog-cb:checked')).map(cb => {
-        const r = analogData[parseInt(cb.dataset.idx)];
-        return { name: r.name, callsign: r.callsign, rx_freq: r.rx_freq,
-                 tx_freq: r.tx_freq, ctcss_encode: r.ctcss_encode,
-                 state: r.state || '' };
-      });
-    }
-
-    // -------------------------------------------------------------------------
-    // Step 5b: Manual hotspot talkgroups
+    // Step 5: Manual hotspot talkgroups
     // -------------------------------------------------------------------------
     function addManualTg(name='', tgId='') {
       const div = document.createElement('div');
       div.className = 'row manual-tg-row';
-      div.style.marginBottom = '0.4rem';
+      div.style.marginBottom = '.4rem';
       div.innerHTML = `
-        <div style="flex:2"><input type="text" class="manual-tg-name" placeholder="e.g. Midwest" maxlength="12" value="${escapeHtml(name)}"></div>
-        <div style="flex:1"><input type="number" class="manual-tg-id" placeholder="e.g. 3169" min="1" value="${tgId}"></div>
-        <div style="width:40px;display:flex;align-items:center;justify-content:center">
-          <button class="secondary" style="padding:0.3rem 0.6rem" onclick="this.closest('.manual-tg-row').remove()">✕</button>
+        <div style="flex:2"><input type="text" class="manual-tg-name" placeholder="Display name (12 max)" maxlength="12" value="${escapeHtml(name)}"></div>
+        <div style="flex:1"><input type="number" class="manual-tg-id" placeholder="TG number" min="1" value="${escapeHtml(tgId)}"></div>
+        <div style="flex:0 0 auto;display:flex;align-items:center">
+          <button class="secondary icon" onclick="this.closest('.manual-tg-row').remove(); updateSummary()"
+                  aria-label="Remove talkgroup">✕</button>
         </div>
       `;
       qs('#manualTgList').appendChild(div);
@@ -767,37 +1249,102 @@
     }
 
     // -------------------------------------------------------------------------
-    // Step 8: Generate
+    // Live summary, step rail, and generate gating
+    // -------------------------------------------------------------------------
+    function collectBlockers() {
+      const b = [];
+      if (!userCallsign) b.push('Look up your DMR ID');
+      if (!getSelectedStates().length) b.push('Add at least one state');
+      if (!qsa('.net-cb:checked').length) b.push('Select at least one network');
+      if (!qsa('.rep-cb:checked').length && !qsa('.analog-cb:checked').length) {
+        b.push('Select at least one repeater');
+      }
+      if (!qs('#agreeBox').checked) b.push('Agree to the terms');
+      if (qs('#initials').value.trim().length < 2) b.push('Enter your initials');
+      return b;
+    }
+
+    function updateSummary() {
+      const states     = getSelectedStates();
+      const repChecked = qsa('.rep-cb:checked');
+      const anaChecked = qsa('.analog-cb:checked');
+      const tgChecked  = qsa('.tg-cb:checked').length + getManualTgs().length;
+
+      const set = (id, value, ok) => {
+        const el = qs('#' + id);
+        el.textContent = value;
+        el.classList.toggle('pending', !ok);
+      };
+      set('sumCallsign',  userCallsign || '—', !!userCallsign);
+      set('sumStates',    states.length || '—', states.length > 0);
+      set('sumRepeaters', repChecked.length ? `${repChecked.length} of ${repeaterData.length}` : '—', repChecked.length > 0);
+      set('sumAnalog',    anaChecked.length ? `${anaChecked.length} of ${analogData.length}` : '—', anaChecked.length > 0);
+      set('sumHotspot',   tgChecked || '—', tgChecked > 0);
+
+      // Channel estimate: one per talkgroup plus a disconnect channel per zone.
+      // Approximate, but it warns you before download if you are near the
+      // radio's limits rather than after.
+      let channels = 0, zones = 0;
+      repChecked.forEach(cb => {
+        const r = repeaterData[cb.dataset.idx];
+        if (!r) return;
+        channels += (r.talkgroup_count || 0) + 1;
+        zones += 1;
+      });
+      channels += anaChecked.length;
+      zones += Math.ceil(anaChecked.length / 64);
+      if (tgChecked) { channels += tgChecked + 1; zones += Math.ceil((tgChecked + 1) / 64); }
+      qs('#sumChannels').textContent = channels;
+      qs('#sumZones').textContent = zones;
+
+      const repCount = qs('#repCount');
+      if (repCount) repCount.textContent = `${repChecked.length} of ${repeaterData.length} selected`;
+      const anaCount = qs('#analogCount');
+      if (anaCount) anaCount.textContent = `${anaChecked.length} of ${analogData.length} selected`;
+
+      const done = {
+        1: !!userCallsign,
+        2: states.length > 0,
+        3: qsa('.net-cb:checked').length > 0,
+        4: repChecked.length > 0 || anaChecked.length > 0,
+        5: tgChecked > 0,
+        6: true,
+        7: qs('#agreeBox').checked && qs('#initials').value.trim().length >= 2,
+      };
+      Object.entries(done).forEach(([n, ok]) => {
+        const link = qs(`#rail a[data-step="${n}"]`);
+        if (link) link.classList.toggle('done', ok);
+        const card = qs(`#step${n}`);
+        if (card) card.classList.toggle('is-done', ok);
+      });
+
+      const blockers = collectBlockers();
+      qs('#blockerList').innerHTML = blockers.map(t => `<li>${escapeHtml(t)}</li>`).join('');
+      qs('#blockers').classList.toggle('hidden', blockers.length === 0);
+      qs('#btnGenerate').disabled = blockers.length > 0;
+    }
+
+    // -------------------------------------------------------------------------
+    // Generate
     // -------------------------------------------------------------------------
     async function generateCodeplug() {
       clearError('genError');
 
+      const blockers = collectBlockers();
+      if (blockers.length) { setError('genError', blockers[0]); return; }
+
       const dmrId = parseInt(qs('#dmrId').value, 10);
-      if (!dmrId) { setError('genError', 'Enter your DMR ID'); return; }
-      if (!userCallsign) { setError('genError', 'Look up your DMR ID first'); return; }
-
       const states = getSelectedStates();
-      if (!states.length) { setError('genError', 'Add at least one state'); return; }
       const locations = states.map(s => ({ city: '', state: s }));
-
       const networks = Array.from(qsa('.net-cb:checked')).map(cb => cb.value);
-      if (!networks.length) { setError('genError', 'Select at least one network'); return; }
 
       const selected = Array.from(qsa('.rep-cb:checked')).map(cb => {
         const r = repeaterData[cb.dataset.idx];
         return r.callsign + ':' + r.rx_freq.toFixed(5);
       });
-      if (!selected.length) { setError('genError', 'Select at least one repeater'); return; }
-
       const hotspotTgs = Array.from(qsa('.tg-cb:checked')).map(cb => parseInt(cb.value, 10));
 
-      if (!qs('#agreeBox').checked) { setError('genError', 'You must agree to the disclaimer'); return; }
-      const initials = qs('#initials').value.trim().toUpperCase();
-      if (initials.length < 2) { setError('genError', 'Type your initials (2+ characters)'); return; }
-
-      qs('#btnGenerate').disabled = true;
-      qs('#btnGenerate').textContent = 'Generating...';
-
+      busy(qs('#btnGenerate'), 'Generating…');
       try {
         const body = JSON.stringify({
           dmr_id: dmrId,
@@ -812,7 +1359,7 @@
           selected_analog: getSelectedAnalog(),
           hotspot_freq: parseFloat(qs('#hsFreq').value) || 433.550,
           power: qs('#power').value,
-          initials,
+          initials: qs('#initials').value.trim().toUpperCase(),
         });
 
         const resp = await fetch('/api/generate', {
@@ -833,12 +1380,12 @@
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        qs('#btnGenerate').textContent = '✓ Downloaded!';
-        setTimeout(() => { qs('#btnGenerate').textContent = '📻 Generate & Download Codeplug'; qs('#btnGenerate').disabled = false; }, 3000);
+        qs('#btnGenerate').textContent = '✓ Downloaded';
+        setTimeout(() => { idle(qs('#btnGenerate'), 'Generate & download'); updateSummary(); }, 3000);
       } catch (e) {
         setError('genError', e || 'Generation failed');
-        qs('#btnGenerate').disabled = false;
-        qs('#btnGenerate').textContent = '📻 Generate & Download Codeplug';
+        idle(qs('#btnGenerate'), 'Generate & download');
+        updateSummary();
       }
     }
 
@@ -846,14 +1393,25 @@
     // Utilities
     // -------------------------------------------------------------------------
     function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>"']/g, m =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     }
 
     // -------------------------------------------------------------------------
     // Init
     // -------------------------------------------------------------------------
+    // One delegated listener keeps the summary honest without every render
+    // path having to remember to call it.
+    document.addEventListener('change', updateSummary);
+    document.addEventListener('input', e => {
+      if (e.target.id === 'initials'
+          || e.target.classList.contains('manual-tg-name')
+          || e.target.classList.contains('manual-tg-id')) updateSummary();
+    });
+
     loadTalkgroups();
+    updateSummary();
   </script>
 </body>
 </html>

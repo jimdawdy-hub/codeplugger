@@ -190,6 +190,8 @@ class CodeplugBuilder:
             rx_groups=self._rx_groups,
             channels=self._channels,
             zones=self._zones,
+            radio_id=self.req.dmr_id,
+            radio_name=self.req.callsign,
         )
         return codeplug
 
@@ -339,7 +341,7 @@ class CodeplugBuilder:
                     tx_contact=cname,
                     rx_group="None",
                     power="Low",
-                    tx_admit="Always",
+                    tx_admit="Allow TX",
                     dmr_id=self.req.callsign,
                 ))
                 channel_names.append(ch_name)
@@ -367,7 +369,7 @@ class CodeplugBuilder:
                     tx_contact=disc_cname,
                     rx_group="None",
                     power="Low",
-                    tx_admit="Always",
+                    tx_admit="Allow TX",
                     dmr_id=self.req.callsign,
                 ))
                 channel_names.append(disc_ch_name)
