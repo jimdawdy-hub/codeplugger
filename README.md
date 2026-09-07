@@ -4,11 +4,38 @@ Automatic codeplug generation for the **Baofeng DM-32UV** DMR radio.
 
 Pulls repeater data from RadioID, BrandMeister, and a bundled database of 16,000+
 repeaters built from RepeaterBook KML data and regional directory PDFs. Produces
-4 CSV files ready to import into the DM-32UV CPS programming software.
+CSV files ready to import into the DM-32UV CPS programming software.
 
-Available as a **web UI** and a **command-line tool**.
+Available as a **Docker container**, a **downloadable package**, and a
+**command-line tool**.
 
 ![CODEPLUGGER](web/static/logo.png)
+
+---
+
+## Install — Docker (recommended if you have it)
+
+```bash
+docker run --rm -p 8000:8000 ghcr.io/jimdawdy-hub/codeplugger:latest
+```
+
+Then open <http://localhost:8000>.
+
+Or with Compose, which also keeps the BrandMeister cache between restarts:
+
+```bash
+docker compose up
+```
+
+To build it yourself from a clone:
+
+```bash
+docker build -t codeplugger .
+docker run --rm -p 8000:8000 codeplugger
+```
+
+The image bundles the repeater database, so it works offline for analog
+searches. DMR repeater search still needs internet access to reach RadioID.
 
 ---
 
@@ -123,11 +150,11 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 1. Open your web browser (Chrome, Edge, Firefox, whatever you normally use)
 2. In the address bar, type: **`http://localhost:8000`** and press Enter
 3. The CODEPLUGGER page loads — fill in the form, generate your codeplug, download the ZIP
-4. Unzip the downloaded codeplug and import the 4 CSV files into the DM-32UV CPS software in this exact order:
-   1. **Talk Groups**
-   2. **RX Group Lists**
-   3. **Channels**
-   4. **Zones**
+4. Unzip the downloaded codeplug and import the CSV files into the DM-32UV CPS software in this exact order:
+   1. **DMR ID** (`dmr_id.csv`) — do not skip this one, see [Output](#output)
+   2. **Talk Groups** (`talk_groups.csv`)
+   3. **Channels** (`channels.csv`)
+   4. **Zones** (`zones.csv`)
 
 A `README.txt` is included in the ZIP that explains the import order again.
 
@@ -221,14 +248,32 @@ The KML ZIP can be downloaded from https://drive.google.com/drive/folders/10Lvzk
 
 ## Output
 
-Four CSV files for import into the DM-32UV CPS — **in this order:**
+CSV files for import into the DM-32UV CPS — **in this order:**
 
-| # | File | Contents |
-|---|------|----------|
-| 1 | `talk_groups.csv` | Talkgroup list (TX Contact references these by name) |
-| 2 | `rx_group_lists.csv` | Receive group lists |
-| 3 | `channels.csv` | One channel per talkgroup per repeater, plus hotspot zones and analog channels |
-| 4 | `zones.csv` | Per-repeater zones, per-category hotspot zones, per-state/band analog zones |
+| # | File | Import as | Contents |
+|---|------|-----------|----------|
+| 1 | `dmr_id.csv` | DMR ID / Radio ID | Your radio's own DMR ID and the name every channel references |
+| 2 | `talk_groups.csv` | Talk Groups | Talkgroup list (TX Contact references these by name) |
+| 3 | `channels.csv` | Channels | One channel per talkgroup per repeater, plus hotspot and analog channels |
+| 4 | `zones.csv` | Zones | Per-repeater zones, per-category hotspot zones, per-state/band analog zones |
+
+`rx_group_lists.csv` is only included when the codeplug actually defines RX
+groups. Importing a header-only file just asks the CPS to apply an empty table.
+
+### Why the order matters — and why you might see "Null Ch."
+
+The CPS links these files by **name**, not by row number. Import one out of
+order and everything referring to it silently points at nothing: TX Contact
+goes blank, and zones fill with `Null Ch.`.
+
+The one that catches people is `dmr_id.csv`. A channel's **DMR ID** column is
+a *name* pointing into the radio's Radio ID table — it is not the numeric DMR
+ID. A factory-fresh CPS document has placeholders there (`Radio 1`, `Radio 2`,
+…), so a channel asking for your callsign matches nothing and never binds.
+
+If your CPS build has no DMR ID import option, open the Radio ID list and set
+entry 1 to your DMR ID and your callsign by hand, then import channels and
+zones again.
 
 ---
 
@@ -246,6 +291,21 @@ Four CSV files for import into the DM-32UV CPS — **in this order:**
 
 ---
 
+## Running the tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/
+```
+
+`tests/test_dm32_format.py` pins the CSV wire format the DM-32UV CPS expects:
+column headers, accepted enum values, name length limits, and — most
+importantly — referential integrity between the files. The CPS reports no
+errors on a malformed import, it just drops what it cannot parse, so this is
+the only feedback loop there is.
+
+---
+
 ## Project structure
 
 ```
@@ -260,14 +320,19 @@ codeplug/
 ├── hearham_import.py  — HearHam.com DMR talkgroup scraper
 ├── defaults.py        — TG abbreviations, network prefixes
 ├── builder.py         — CodeplugBuilder: assembles codeplug from repeater data
-└── csv_export.py      — Writes the 4 DM-32UV CSV files
+└── csv_export.py      — Writes the DM-32UV CSV files
 
 web/
 ├── app.py             — FastAPI backend
 └── static/index.html  — Single-page dark-themed UI
 
+tests/
+└── test_dm32_format.py — CSV wire-format conformance tests
+
 main.py                — CLI entry point
 import_data.py         — Repeater database build tool
+Dockerfile             — Container image
+docker-compose.yml     — One-command local run
 ```
 
 ---

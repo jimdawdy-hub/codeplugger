@@ -3,11 +3,12 @@
 ## DMR Fundamentals
 
 ### Codeplug Build Order (Bottom-Up)
-The four CSV files must be imported in this exact order:
-1. `digital_contacts.csv` — personal address book (private call ham operators)
-2. `rx_group_lists.csv` — receive group lists (talkgroup filters, usually unused)
-3. `channels.csv` — channels reference contacts and RX groups by name
-4. `zones.csv` — zones reference channels by name
+The CSV files must be imported in this exact order:
+1. `dmr_id.csv` — the radio's own Radio ID table; channels reference it by name
+2. `talk_groups.csv` — talkgroups; channels reference these via TX Contact
+3. `rx_group_lists.csv` — receive group lists (talkgroup filters, usually unused)
+4. `channels.csv` — channels reference contacts and RX groups by name
+5. `zones.csv` — zones reference channels by name
 
 If you import channels before contacts, the TX Contact field silently becomes None.
 **However**: this dependency only applies to named references. With `GroupCall Match = Off`
@@ -37,6 +38,46 @@ The RX Group List filters which incoming group calls open the squelch on a chann
   the channel's assigned RX group.
 - A channel can reference `None` as its RX group — this is valid and means no filtering.
 
+### The Channel "DMR ID" Column Is a Name, Not a Number
+This one cost a user a working codeplug and took a while to find.
+
+The `DMR ID` column in `channels.csv` is a **name reference into the radio's
+Radio ID table** (`DMR-ID.csv`: `No., Radio ID, Radio Name`). It is not the
+numeric DMR ID. A factory-fresh CPS document ships that table pre-populated
+with placeholders — `Radio 1`, `Radio 2`, and so on.
+
+Write a callsign there without also supplying the Radio ID table and every
+channel references a name the CPS has never seen. The channels do not bind.
+Nothing is reported. The damage only becomes visible one step later, when
+`zones.csv` is imported and the zone members have nothing to resolve against,
+so the radio shows `Null Ch.` for everything.
+
+It is invisible to whoever built the codeplug, because their own CPS document
+already has a Radio ID entry named after their callsign. Always generate
+`dmr_id.csv` and import it first.
+
+### TX Admit: "Channel Idle" / "Allow TX"
+The DM-32 wire values are `Channel Idle` and `Allow TX`. `Color Code Free` is
+the **AnyTone** spelling and the DM-32 CPS does not accept it. Confirmed
+against a CPS v1.60 export, which only ever emits those two values.
+
+### Power Ladder: High / Middle / Low
+Not "Medium". The CPS writes `Middle`.
+
+### Verifying the CSV Format
+The CPS is closed source and reports nothing on a bad import — it accepts the
+file, drops the rows it cannot parse, and lets you discover the damage on the
+radio. The only reliable way to check the format is to diff generated output
+against a real CPS export. Two useful references:
+
+- `github.com/pskillen/codeplug-tool` — `sample-exports/Baofeng DM32 CPS v1.60/`
+  has genuine exports of all eight CSV files, plus a documented column reference
+- `github.com/mrshadowsys/Quansheng-DM32UV-Chirp-to-DM32-channel-list-` — a
+  working CHIRP converter, useful as a second opinion on channel columns
+
+`tests/test_dm32_format.py` encodes what those exports establish. Extend it
+before changing anything in `csv_export.py`.
+
 ### RX Group Name Limit: 11 Characters
 The DM-32UV CPS silently drops any RX Group List reference in a channel if the
 group's name exceeds 11 characters, writing `None` instead. This is a CPS bug,
@@ -49,11 +90,12 @@ Channel names are hard-capped at 16 characters. The DM-32UV displays this on its
 ### Zone Name Limit: 16 Characters
 Zone names are also 16 characters max (display only, not referenced by other tables).
 
-### TX Admit
-- `Color Code Free`: radio transmits only when the channel's color code is not in use.
-- `Always`: radio transmits regardless (used for hotspot channels).
-- The CPS normalizes all digital channels to "Always" on export, even if you imported
-  "Color Code Free". This is CPS behavior, not a bug in our code.
+### TX Admit (values)
+- `Channel Idle`: radio transmits only when the channel is not in use.
+- `Allow TX`: radio transmits regardless (used for hotspot channels).
+- Earlier notes here claimed the CPS accepted `Color Code Free` / `Always` and
+  normalized them on export. A v1.60 export shows only `Channel Idle` and
+  `Allow TX`, so those earlier values were wrong — see the TX Admit note above.
 
 ### Color Code
 Analogous to CTCSS in analog. Must match the repeater's color code (0–15).

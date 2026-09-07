@@ -168,6 +168,9 @@ show callsign/freq/CC but no TG data. Useful for color code lookup; TG data is s
 - `~/.config/dmr-codeplug-bm-devices.json` — all BM devices (~32K entries)
 - `~/.config/dmr-codeplug-bm-talkgroups.json` — BM talkgroup catalog (~1,750 entries)
 
+In Docker these live in the `bm-cache` volume mounted at
+`/home/codeplugger/.config`.
+
 Use `--refresh-bm` (CLI) to force refresh.
 
 ---
@@ -194,8 +197,8 @@ CodeplugBuilder
     ↓ TG name: BM catalog > RadioID description > TG_ABBREV fallback > T{id}
     ↓ enforce MAX_NAME_LEN = 12 on all names
 csv_export
-    ↓ write 4 CSV files + README.txt → ZIP
-User imports: Talk Groups → RX Group Lists → Channels → Zones
+    ↓ write CSV files + README.txt → ZIP
+User imports: DMR ID → Talk Groups → Channels → Zones
 ```
 
 ---
@@ -285,12 +288,16 @@ POST /api/generate              → full generate request → ZIP download
 
 **Critical:** The CPS requires this exact import sequence:
 
-1. **Talk Groups** (`talk_groups.csv`)
-2. **RX Group Lists** (`rx_group_lists.csv`)
-3. **Channels** (`channels.csv`)
-4. **Zones** (`zones.csv`)
+1. **DMR ID** (`dmr_id.csv`)
+2. **Talk Groups** (`talk_groups.csv`)
+3. **RX Group Lists** (`rx_group_lists.csv`) — only shipped when non-empty
+4. **Channels** (`channels.csv`)
+5. **Zones** (`zones.csv`)
 
-Importing in wrong order causes `TX Contact` fields to show "None".
+Importing in the wrong order causes `TX Contact` fields to show "None". Skipping
+`dmr_id.csv` is worse: the channel `DMR ID` column is a name reference into the
+radio's Radio ID table, so on a stock CPS document no channel binds at all and
+the radio shows `Null Ch.` for everything. See LESSONS_LEARNED.md.
 
 The downloaded ZIP includes `README.txt` with this info and a legal disclaimer.
 
