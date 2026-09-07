@@ -1,0 +1,26 @@
+# Keep the image to what the app actually loads at runtime:
+#   codeplug/ web/ data/repeaters.db "Talkgroups BrandMeister.csv"
+
+.git
+.github
+.gitignore
+.venv
+.pytest_cache
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# packaging artefacts
+build
+dist
+*.spec
+output
+
+# docs and dev-only files
+CHANGELOG.md
+LESSONS_LEARNED.md
+ONBOARDING.md
+logo.png
+tests
+requirements-dev.txt

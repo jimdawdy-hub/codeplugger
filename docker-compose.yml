@@ -1,0 +1,15 @@
+services:
+  codeplugger:
+    build: .
+    image: codeplugger:latest
+    container_name: codeplugger
+    ports:
+      - "8000:8000"
+    volumes:
+      # BrandMeister device and talkgroup lists are cached under $HOME/.config.
+      # Keeping them in a volume avoids re-downloading on every restart.
+      - bm-cache:/home/codeplugger/.config
+    restart: unless-stopped
+
+volumes:
+  bm-cache:

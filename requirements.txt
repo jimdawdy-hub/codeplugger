@@ -1,3 +1,6 @@
-httpx>=0.27.0
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
+# Pinned so a build today matches a build six months from now.
+# Bump deliberately; the CSV format tests will catch anything that regresses.
+fastapi==0.141.1
+httpx==0.28.1
+pydantic==2.13.5
+uvicorn[standard]==0.52.4
