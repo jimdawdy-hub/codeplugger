@@ -36,3 +36,6 @@ drive-download*.zip
 
 # Secrets (never commit)
 ~/.config/dmr-codeplug.json
+
+# local dev
+.venv/

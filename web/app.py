@@ -487,7 +487,7 @@ async def generate(req: GenerateRequest):
                     tx_contact=name,
                     rx_group="None",
                     power="Low",
-                    tx_admit="Always",
+                    tx_admit="Allow TX",
                     dmr_id=req.callsign,
                 ))
                 existing_channel_names.add(name)
@@ -513,7 +513,7 @@ async def generate(req: GenerateRequest):
                         tx_contact=disc_ch_name,
                         rx_group="None",
                         power="Low",
-                        tx_admit="Always",
+                        tx_admit="Allow TX",
                         dmr_id=req.callsign,
                     ))
 

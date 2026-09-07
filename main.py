@@ -33,7 +33,7 @@ def main():
                         default=["BrandMeister", "DMR-MARC"],
                         help="Networks to include (BrandMeister DMR-MARC ChicagoLand-CC Tristate)")
     parser.add_argument("--max",      type=int, default=25,    help="Max repeaters to include")
-    parser.add_argument("--power",    type=str, default="High", choices=["High", "Low", "Medium"])
+    parser.add_argument("--power",    type=str, default="High", choices=["High", "Middle", "Low"])
     parser.add_argument("--hotspot",  action="store_true",     help="Include a hotspot zone")
     parser.add_argument("--hs-freq",  type=float, default=433.550, help="Hotspot simplex frequency (default 433.550)")
     parser.add_argument("--hs-tgs",   type=int, nargs="+", default=[],
@@ -249,13 +249,20 @@ def main():
 
     print(f"\nWriting CSV files to '{args.out}/'...")
     csv_export.write_to_directory(codeplug, args.out)
+    import_as = {
+        "dmr_id.csv":         'DMR ID / Radio ID',
+        "talk_groups.csv":    "Talk Groups",
+        "rx_group_lists.csv": "Digital RX Group Lists",
+        "channels.csv":       "Channels",
+        "zones.csv":          "Zones",
+    }
     print("\nDone. Import the files into the DM-32UV CPS in this order:")
-    print("  1. talk_groups.csv        (Talk Groups — REQUIRED for TX Contact lookups)")
-    print("  2. rx_group_lists.csv     (Digital RX Groups)")
-    print("  3. channels.csv           (Channels)")
-    print("  4. zones.csv              (Zones)")
-    print("\nNote: digital_contacts.csv is NOT generated — it is only needed for")
-    print("private-call contacts (ham operators). Talkgroup lookups use Talk Groups.csv.")
+    for i, fname in enumerate(csv_export.build_file_map(codeplug), 1):
+        print(f"  {i}. {fname:<21} ({import_as[fname]})")
+    print("\nImport dmr_id.csv first: every channel's 'DMR ID' column is a name")
+    print("reference into the radio's Radio ID table, and a stock CPS document")
+    print("only has placeholder names ('Radio 1', ...).  Skip it and the channels")
+    print("never bind, which shows up as 'Null Ch.' once you import zones.csv.")
 
 
 if __name__ == "__main__":

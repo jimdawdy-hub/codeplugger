@@ -47,7 +47,7 @@ class Channel:
     tx_contact: str     # must exactly match a Contact.name
     rx_group: str       # must exactly match an RXGroup.name, or "" for analog
     power: str = "High"
-    tx_admit: str = "Color Code Free"  # Digital default
+    tx_admit: str = "Channel Idle"  # DM-32 wire value; "Allow TX" transmits regardless
     squelch: int = 3
     dmr_id: str = ""    # user callsign string
 
@@ -91,8 +91,13 @@ class Codeplug:
     channels: list[Channel]
     zones: list[Zone]
 
+    # The radio's own DMR ID, exported as dmr_id.csv.  Channel.dmr_id is a
+    # *name* reference into that table, so the two must stay in sync.
+    radio_id: int = 0
+    radio_name: str = ""
+
     # Radio limits for DM-32UV
-    MAX_CHANNELS = 4000
+    MAX_CHANNELS = 1000
     MAX_ZONES = 250
     MAX_CONTACTS = 1000
     MAX_RX_GROUPS = 250
