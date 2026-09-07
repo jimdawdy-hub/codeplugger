@@ -93,16 +93,40 @@ jobs:
             | macOS | `CODEPLUGGER-macos.tar.gz` |
             | Linux | `CODEPLUGGER-linux.tar.gz` |
 
-            ### How to install
-
             **Windows:** Download the ZIP, extract it anywhere, double-click `CODEPLUGGER.exe`.
             Your browser will open automatically to the app.
 
             **macOS / Linux:** Download the tar.gz, extract it, run `./CODEPLUGGER` in a terminal.
 
+            ### Or run it with Docker
+
+            ```
+            docker run --rm -p 8000:8000 ghcr.io/jimdawdy-hub/codeplugger:${{ github.ref_name }}
+            ```
+
+            Then open http://localhost:8000
+
+            ### Importing the codeplug — order matters
+
+            Unzip what the app gives you and import into the DM-32UV CPS in this order:
+
+            1. `dmr_id.csv` — as **DMR ID** / **Radio ID**
+            2. `talk_groups.csv` — as **Talk Groups**
+            3. `channels.csv` — as **Channels**
+            4. `zones.csv` — as **Zones**
+
+            Do not skip step 1. Each channel's `DMR ID` column is a *name* pointing
+            into the radio's Radio ID table, not the numeric DMR ID. A factory-fresh
+            CPS document has placeholders there, so if that table is never imported
+            no channel binds and the radio shows `Null Ch.` for everything.
+
             > **Alpha software** — see the Discussions tab before using.
           draft: false
-          prerelease: true
+          # Published as a full release, not a prerelease: GitHub never marks a
+          # prerelease as "Latest", which would leave an older buggy build sitting
+          # at the top of the releases page.
+          prerelease: false
+          make_latest: true
           files: |
             artifacts/**/*.zip
             artifacts/**/*.tar.gz
