@@ -282,7 +282,7 @@ zones again.
 - **Bundled repeater database** — 16,000+ analog repeaters from all 50 states, no API keys required
 - **State-only search** — pick states, get all repeaters, choose what you want
 - **Per-category hotspot zones** — Wide Area, US States, Countries, Language, Activity, Emcomm, Link — each capped at 64 channels with overflow paging
-- **Mandatory disconnect** — every hotspot zone ends with TG 4000 disconnect; users can't accidentally omit it
+- **Mandatory disconnect** — every hotspot zone ends with TG 4000 disconnect ('Disc', not Discovery); users can't accidentally omit it
 - **Per-state/band analog zones** — separate "IL 2m Analog", "IL 70cm Analog", "IN 2m Analog" zones rather than one giant Analog zone
 - **BrandMeister verification** (optional, with key) — cross-references RadioID data against BM device registry
 - **Official TG names from CSV** — bundled BM talkgroup catalog (1,700+ entries)
