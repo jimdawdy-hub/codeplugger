@@ -358,8 +358,8 @@ async def generate(req: GenerateRequest):
         if f"{r.callsign.upper()}:{r.rx_freq:.5f}" in selected_set
     ]
 
-    if not repeaters:
-        raise HTTPException(status_code=400, detail="No repeaters selected")
+    if not repeaters and not req.selected_analog and not req.hotspot_tg_ids and not req.manual_hotspot_tgs:
+        raise HTTPException(status_code=400, detail="No repeaters or talkgroups selected")
 
     # BM data — use CSV catalog as primary TG name source; API for device verification
     bm_talkgroups: dict[int, str] = dict(_BM_TG_NAMES)  # CSV names

@@ -339,8 +339,9 @@ NOTES
 -----
 - Parrot (TG 9990 / TG 310997) channels are set to Private Call type.
   Parrot will NOT respond if called as a Group Call.
-- TG 4000 (Disconnect) disconnects the repeater from its current
-  reflector or talkgroup.  Useful after a linked QSO.
+- TG 4000 (Disconnect, labeled "Disc" in channel names, NOT Discovery)
+  disconnects the repeater or hotspot from its current reflector or talkgroup.
+  Useful after a linked QSO.
 - Verify all frequencies, offsets, and color codes against current
   repeater listings before transmitting.  Repeater data comes from
   RadioID.net and may not reflect recent changes.

@@ -120,4 +120,11 @@ class Codeplug:
         for g in self.rx_groups:
             if len(g.contacts) > self.MAX_CONTACTS_PER_GROUP:
                 warnings.append(f"RX group '{g.name}' has {len(g.contacts)} contacts, max is {self.MAX_CONTACTS_PER_GROUP}")
+        if not self.radio_name:
+            warnings.append("Codeplug has no radio_name set; channels will fail to bind to Radio ID in CPS")
+        for ch in self.channels:
+            if not ch.dmr_id:
+                warnings.append(f"Channel '{ch.name}' has empty DMR ID")
+            elif self.radio_name and ch.dmr_id != self.radio_name:
+                warnings.append(f"Channel '{ch.name}' DMR ID '{ch.dmr_id}' does not match radio_name '{self.radio_name}'")
         return warnings
