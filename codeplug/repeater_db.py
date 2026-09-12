@@ -47,11 +47,13 @@ CREATE INDEX IF NOT EXISTS idx_rx_freq     ON repeaters(rx_freq);
 
 
 def get_connection(db_path: pathlib.Path = DB_PATH) -> sqlite3.Connection:
+    needs_schema = not db_path.exists()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    conn.executescript(_SCHEMA)
-    conn.commit()
+    if needs_schema:
+        conn.executescript(_SCHEMA)
+        conn.commit()
     return conn
 
 

@@ -13,7 +13,7 @@ import sys
 from codeplug import radioid, csv_export, brandmeister
 from codeplug.builder import CodeplugBuilder
 from codeplug.models import CodeplugRequest
-from codeplug.defaults import BM_HOTSPOT_TGS
+from codeplug.defaults import BM_HOTSPOT_TGS, expand_networks
 
 
 def main():
@@ -74,19 +74,7 @@ def main():
 
     # --- Step 2: Search for repeaters ---
     # RadioID ipsc_network is self-reported — cover all observed spellings.
-    network_aliases = {
-        "BrandMeister": ["BrandMeister", "Brandmeister", "BRANDMEISTER", "BM", "bm", "Bm",
-                         "BrandMesiter", "Brandmister"],
-        "DMR-MARC":     ["DMR-MARC", "MARC",
-                         "ChicagoLand-CC", "Chicagoland-CC", "ChicagoLand-CC ",
-                         "ChicagoLand", "Chicagoland", "Chicago Land", "chicago land cc ",
-                         "Chicagoland C-Bridge", "chi-dmr", "DMR-IL"],
-        "Tristate":     ["Tristate", "TriState", "TriStateDMR", "TriSTateDMR"],
-        "ChicagoLand-CC": [],  # folded into DMR-MARC above
-    }
-    api_networks: list[str] = []
-    for n in args.networks:
-        api_networks.extend(network_aliases.get(n, [n]))
+    api_networks = expand_networks(args.networks)
 
     # Build list of (city, state) locations to search
     locations: list[tuple[str, str]] = []

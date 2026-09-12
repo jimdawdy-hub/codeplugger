@@ -29,6 +29,7 @@ from codeplug import radioid, csv_export, brandmeister
 from codeplug import repeater_db
 from codeplug import bm_talkgroups as bm_catalog_mod
 from codeplug.builder import CodeplugBuilder
+from codeplug.defaults import NETWORK_ALIASES, expand_networks
 from codeplug.models import Channel, CodeplugRequest, Contact, Repeater, Talkgroup, Zone
 
 # Load TG catalog and name map from CSV once at startup
@@ -37,26 +38,7 @@ _BM_TG_NAMES: dict[int, str] = bm_catalog_mod.load_tg_names()
 
 app = FastAPI(title="CODEPLUGGER")
 
-# RadioID ipsc_network spellings are self-reported and wildly inconsistent.
-# Each key is the canonical UI label; the list covers all observed variants.
-NETWORK_ALIASES: dict[str, list[str]] = {
-    "BrandMeister": ["BrandMeister", "Brandmeister", "BRANDMEISTER", "BM", "bm", "Bm",
-                     "BrandMesiter", "Brandmister"],
-    "DMR-MARC":     ["DMR-MARC", "MARC",
-                     "ChicagoLand-CC", "Chicagoland-CC", "ChicagoLand-CC ",
-                     "ChicagoLand", "Chicagoland", "Chicago Land", "chicago land cc ",
-                     "Chicagoland C-Bridge", "chi-dmr", "DMR-IL"],
-    "Tristate":     ["Tristate", "TriState", "TriStateDMR", "TriSTateDMR"],
-    "ChicagoLand-CC": [],  # folded into DMR-MARC above; kept for UI compat
-}
-
-
-def _expand_networks(selected: list[str]) -> list[str]:
-    """Expand UI network names to all RadioID ipsc_network variants."""
-    out: list[str] = []
-    for n in selected:
-        out.extend(NETWORK_ALIASES.get(n, [n]))
-    return out
+_expand_networks = expand_networks
 
 # Serve static files (the single-page UI)
 STATIC_DIR = _PKG_ROOT / "web" / "static"
@@ -170,7 +152,7 @@ async def health():
 
 
 @app.get("/api/hotspot-talkgroups")
-async def hotspot_talkgroups():
+def hotspot_talkgroups():
     """Return the BM hotspot talkgroup catalog grouped by category (from CSV)."""
     return {
         "groups": _BM_CATALOG,
@@ -179,7 +161,7 @@ async def hotspot_talkgroups():
 
 
 @app.post("/api/lookup-user")
-async def lookup_user(req: LookupUserRequest):
+def lookup_user(req: LookupUserRequest):
     user = radioid.lookup_user(req.dmr_id)
     if user is None:
         raise HTTPException(status_code=404, detail="DMR ID not found")
@@ -199,7 +181,7 @@ def _city_abbrev(city: str, max_len: int = 12) -> str:
 
 
 @app.post("/api/search-analog")
-async def search_analog(req: SearchAnalogRequest):
+def search_analog(req: SearchAnalogRequest):
     """
     Return analog FM amateur repeaters for the selected states from the local
     repeater database (built from RepeaterBook KML and regional PDF directories).
@@ -272,7 +254,7 @@ async def search_analog(req: SearchAnalogRequest):
 
 
 @app.post("/api/search-repeaters")
-async def search_repeaters(req: SearchRepeatersRequest):
+def search_repeaters(req: SearchRepeatersRequest):
     api_networks = _expand_networks(req.networks)
 
     # Search by state only — one query per unique state, user selects from results
@@ -329,7 +311,7 @@ async def search_repeaters(req: SearchRepeatersRequest):
 
 
 @app.post("/api/generate")
-async def generate(req: GenerateRequest):
+def generate(req: GenerateRequest):
     if not req.initials or len(req.initials.strip()) < 2:
         raise HTTPException(status_code=400, detail="Initials required")
 
@@ -474,7 +456,7 @@ async def generate(req: GenerateRequest):
         new_channels: list[str] = []
 
         for mtg in req.manual_hotspot_tgs:
-            name = mtg.name.strip()[:12]
+            name = mtg.name.replace("|", "").replace(",", "").strip()[:12]
             if not name or mtg.tg_id < 1:
                 continue
             if name not in existing_contact_names:
@@ -597,10 +579,13 @@ async def generate(req: GenerateRequest):
 
     zip_bytes = csv_export.write_zip(codeplug)
 
+    import re
+    safe_callsign = re.sub(r"[^A-Za-z0-9_-]", "", req.callsign) or "callsign"
+
     return StreamingResponse(
         iter([zip_bytes]),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="codeplug_{req.callsign}.zip"'},
+        headers={"Content-Disposition": f'attachment; filename="codeplug_{safe_callsign}.zip"'},
     )
 
 

@@ -175,6 +175,29 @@ def network_prefix(network: str) -> str:
     return NETWORK_PREFIX.get(network, "BM")
 
 
+# RadioID ipsc_network spellings are self-reported and wildly inconsistent.
+# Each key is the canonical UI label; the list covers all observed variants.
+NETWORK_ALIASES: dict[str, list[str]] = {
+    "BrandMeister": ["BrandMeister", "Brandmeister", "BRANDMEISTER", "BM", "bm", "Bm",
+                     "BrandMesiter", "Brandmister"],
+    "DMR-MARC":     ["DMR-MARC", "MARC",
+                     "ChicagoLand-CC", "Chicagoland-CC", "ChicagoLand-CC ",
+                     "ChicagoLand", "Chicagoland", "Chicago Land", "chicago land cc ",
+                     "Chicagoland C-Bridge", "chi-dmr", "DMR-IL"],
+    "Tristate":     ["Tristate", "TriState", "TriStateDMR", "TriSTateDMR"],
+    "ChicagoLand-CC": [],  # folded into DMR-MARC above; kept for UI/CLI compat
+}
+
+
+def expand_networks(selected: list[str]) -> list[str]:
+    """Expand UI/CLI network names to all RadioID ipsc_network variants."""
+    out: list[str] = []
+    for n in selected:
+        out.extend(NETWORK_ALIASES.get(n, [n]))
+    return out
+
+
+
 # ---------------------------------------------------------------------------
 # Fallback TG lists used when RadioID has no talkgroups for a repeater
 # ---------------------------------------------------------------------------
