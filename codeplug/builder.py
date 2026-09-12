@@ -165,7 +165,9 @@ class CodeplugBuilder:
         self._contacts: dict[str, Contact] = {}  # name → Contact (deduplication)
         self._rx_groups: list[RXGroup] = []
         self._channels: list[Channel] = []
+        self._channel_names: set[str] = set()
         self._zones: list[Zone] = []
+        self._zone_names: set[str] = set()
 
     def build(self, repeaters: list[Repeater]) -> Codeplug:
         # Sort by city for predictable output; stable within a city by frequency
@@ -249,7 +251,7 @@ class CodeplugBuilder:
             # Disambiguate duplicate channel names (shouldn't happen normally)
             base = ch_name
             counter = 2
-            while ch_name in [c.name for c in self._channels]:
+            while ch_name in self._channel_names:
                 ch_name = base[:MAX_NAME_LEN - len(str(counter))] + str(counter)
                 counter += 1
 
@@ -266,6 +268,7 @@ class CodeplugBuilder:
                 dmr_id=self.req.callsign,
             )
             self._channels.append(ch)
+            self._channel_names.add(ch_name)
             channel_names.append(ch_name)
             tg_ids_seen.add(tg.id)
 
@@ -286,7 +289,7 @@ class CodeplugBuilder:
             # Disambiguate
             base = disc_ch_name
             counter = 2
-            while disc_ch_name in [c.name for c in self._channels]:
+            while disc_ch_name in self._channel_names:
                 disc_ch_name = base[:MAX_NAME_LEN - len(str(counter))] + str(counter)
                 counter += 1
 
@@ -302,9 +305,16 @@ class CodeplugBuilder:
                 power=self.req.tx_power,
                 dmr_id=self.req.callsign,
             ))
+            self._channel_names.add(disc_ch_name)
             channel_names.append(disc_ch_name)
 
         # --- Zone ---
+        base_zone = zone_name
+        z_counter = 2
+        while zone_name in self._zone_names:
+            zone_name = base_zone[:MAX_NAME_LEN - len(str(z_counter))] + str(z_counter)
+            z_counter += 1
+        self._zone_names.add(zone_name)
         self._zones.append(Zone(name=zone_name, channels=channel_names[:64]))
 
     # -----------------------------------------------------------------------
@@ -330,7 +340,7 @@ class CodeplugBuilder:
                 contact_names.append(cname)
 
             ch_name = cname  # hotspot channel name matches contact name
-            if ch_name not in [c.name for c in self._channels]:
+            if ch_name not in self._channel_names:
                 self._channels.append(Channel(
                     name=ch_name,
                     channel_type="Digital",
@@ -344,6 +354,7 @@ class CodeplugBuilder:
                     tx_admit="Allow TX",
                     dmr_id=self.req.callsign,
                 ))
+                self._channel_names.add(ch_name)
                 channel_names.append(ch_name)
             hs_tg_ids_seen.add(tg_id)
 
@@ -358,7 +369,7 @@ class CodeplugBuilder:
                     call_type="Group Call",
                 )
             disc_ch_name = disc_cname  # same naming convention
-            if disc_ch_name not in [c.name for c in self._channels]:
+            if disc_ch_name not in self._channel_names:
                 self._channels.append(Channel(
                     name=disc_ch_name,
                     channel_type="Digital",
@@ -372,6 +383,7 @@ class CodeplugBuilder:
                     tx_admit="Allow TX",
                     dmr_id=self.req.callsign,
                 ))
+                self._channel_names.add(disc_ch_name)
                 channel_names.append(disc_ch_name)
 
         if not channel_names:
@@ -379,4 +391,5 @@ class CodeplugBuilder:
 
         # hs_rx_group = RXGroup(name="Hotspot", contacts=contact_names[:32])
         # self._rx_groups.append(hs_rx_group)
+        self._zone_names.add("Hotspot")
         self._zones.append(Zone(name="Hotspot", channels=channel_names[:64]))

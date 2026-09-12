@@ -218,3 +218,94 @@ def test_codeplug_validate_catches_dmr_id_issues():
     )
     warnings = cp_mismatch.validate()
     assert any("does not match radio_name" in w for w in warnings)
+
+
+def test_web_generate_pipe_and_comma_sanitization(client):
+    """Manual hotspot talkgroup names with '|' or ',' must be sanitized."""
+    req_data = {
+        "dmr_id": 3179879,
+        "callsign": "KQ9I",
+        "city": "Chicago",
+        "state": "Illinois",
+        "locations": [{"city": "Chicago", "state": "Illinois"}],
+        "networks": ["BrandMeister"],
+        "selected_repeaters": [],
+        "hotspot_tg_ids": [],
+        "manual_hotspot_tgs": [{"tg_id": 12345, "name": "TG|Pipe,Comma"}],
+        "selected_analog": [],
+        "hotspot_freq": 433.550,
+        "power": "High",
+        "country": "United States",
+        "initials": "JD",
+    }
+
+    resp = client.post("/api/generate", json=req_data)
+    assert resp.status_code == 200
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+
+    channels_csv = zf.read("channels.csv").decode("utf-8")
+    zones_csv = zf.read("zones.csv").decode("utf-8")
+
+    assert "TGPipeComma" in channels_csv
+    assert "|" not in [c["Channel Name"] for c in csv.DictReader(io.StringIO(channels_csv))]
+    # Zone members split by '|' should cleanly resolve
+    zone_rows = list(csv.DictReader(io.StringIO(zones_csv)))
+    for z in zone_rows:
+        members = z["Channel Members"].split("|")
+        assert "TGPipeComma" in members
+
+
+def test_web_generate_safe_filename_header(client):
+    """Content-Disposition header should be sanitized against header injection."""
+    req_data = {
+        "dmr_id": 3179879,
+        "callsign": 'KQ9I"\r\nX-Injected: Bad',
+        "city": "Chicago",
+        "state": "Illinois",
+        "locations": [{"city": "Chicago", "state": "Illinois"}],
+        "networks": ["BrandMeister"],
+        "selected_repeaters": [],
+        "hotspot_tg_ids": [91],
+        "manual_hotspot_tgs": [],
+        "selected_analog": [],
+        "hotspot_freq": 433.550,
+        "power": "High",
+        "country": "United States",
+        "initials": "JD",
+    }
+
+    resp = client.post("/api/generate", json=req_data)
+    assert resp.status_code == 200
+    cd = resp.headers.get("Content-Disposition", "")
+    assert "\r" not in cd and "\n" not in cd
+    assert 'filename="codeplug_KQ9IX-InjectedBad.zip"' == cd.split(" ")[-1]
+
+
+def test_builder_zone_name_disambiguation():
+    """Duplicate zone names from different repeaters must be disambiguated."""
+    from codeplug.builder import CodeplugBuilder
+    from codeplug.models import CodeplugRequest, Repeater, Talkgroup
+
+    # Two repeaters in different cities that would yield identical zone names
+    rep1 = Repeater(
+        callsign="W9AAA", city="Springfield", state="Illinois",
+        country="United States", rx_freq=444.000, offset=5.0,
+        color_code=1, network="BrandMeister", status="on-air",
+        talkgroups=[Talkgroup(3122, 1, "Illinois")],
+    )
+    rep2 = Repeater(
+        callsign="W9BBB", city="Springfield", state="Missouri",
+        country="United States", rx_freq=444.000, offset=5.0,
+        color_code=1, network="BrandMeister", status="on-air",
+        talkgroups=[Talkgroup(3129, 1, "Missouri")],
+    )
+
+    req = CodeplugRequest(
+        dmr_id=3179879, callsign="KQ9I", city="Springfield", state="Illinois",
+        include_hotspot=False,
+    )
+    codeplug = CodeplugBuilder(req).build([rep1, rep2])
+    zone_names = [z.name for z in codeplug.zones]
+    assert len(zone_names) == 2
+    assert len(set(zone_names)) == 2
+
